@@ -1,0 +1,19 @@
+Subject: [PATCH] ui toggle preset
+---
+Index: XIVSlothCombo/Window/Functions/Presets.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/XIVSlothCombo/Window/Functions/Presets.cs b/XIVSlothCombo/Window/Functions/Presets.cs
+--- a/XIVSlothCombo/Window/Functions/Presets.cs	(revision 9da62d42ac234d78027672e15b0d9b127cd73508)
++++ b/XIVSlothCombo/Window/Functions/Presets.cs	(date 1732069251240)
+@@ -91,6 +91,8 @@
+                 ImGui.Separator();
+             }
+ 
++            if (ImGui.Button($"/wrath toggle {preset}")) ImGui.SetClipboardText($"/wrath toggle {preset}");
++
+             if (ImGui.Checkbox($"{info.Name}###{preset}{i}", ref enabled))
+             {
+                 if (enabled)
