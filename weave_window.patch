@@ -1,0 +1,26 @@
+Subject: [PATCH] weave window
+---
+Index: XIVSlothCombo/CustomCombo/Functions/Action.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/XIVSlothCombo/CustomCombo/Functions/Action.cs b/XIVSlothCombo/CustomCombo/Functions/Action.cs
+--- a/XIVSlothCombo/CustomCombo/Functions/Action.cs	(revision ed92c4e7986941a1c58d4d77b115d9a4399c2f53)
++++ b/XIVSlothCombo/CustomCombo/Functions/Action.cs	(date 1732119406456)
+@@ -187,13 +187,13 @@
+         /// <param name="actionID"> Action ID to check. </param>
+         /// <param name="weaveTime"> Time when weaving window is over. Defaults to 0.7. </param>
+         /// <returns> True or false. </returns>
+-        public static bool CanWeave(uint actionID, double weaveTime = 0.7) => (GetCooldown(actionID).CooldownRemaining > weaveTime) || (HasSilence() && HasPacification());
++        public static bool CanWeave(uint actionID, double weaveTime = 0.5) => (GetCooldown(actionID).CooldownRemaining > weaveTime) || (HasSilence() && HasPacification());
+ 
+         /// <summary> Checks if the provided actionID has enough cooldown remaining to weave against it without causing clipping and checks if you're casting a spell. </summary>
+         /// <param name="actionID"> Action ID to check. </param>
+         /// <param name="weaveTime"> Time when weaving window is over. Defaults to 0.6. </param>
+         /// <returns> True or false. </returns>
+-        public static bool CanSpellWeave(uint actionID, double weaveTime = 0.6)
++        public static bool CanSpellWeave(uint actionID, double weaveTime = 0.5)
+         {
+             float castTimeRemaining = LocalPlayer.TotalCastTime - LocalPlayer.CurrentCastTime;
+ 
