@@ -1,0 +1,91 @@
+Subject: [PATCH] command weave
+---
+Index: XIVSlothCombo/XIVSlothCombo.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/XIVSlothCombo/XIVSlothCombo.cs b/XIVSlothCombo/XIVSlothCombo.cs
+--- a/XIVSlothCombo/XIVSlothCombo.cs	(revision f3f5a1c287fef7cd268a6adaa2493a5acc61a8d7)
++++ b/XIVSlothCombo/XIVSlothCombo.cs	(date 1732070071056)
+@@ -30,6 +30,7 @@
+ using XIVSlothCombo.Window.Functions;
+ using XIVSlothCombo.Window.Tabs;
+ using Status = Dalamud.Game.ClientState.Statuses.Status;
++using UIColor = ECommons.ChatMethods.UIColor;
+ 
+ namespace XIVSlothCombo
+ {
+@@ -87,11 +88,30 @@
+                 {
+                     AST.QuickTargetCards.SelectedRandomMember = null;
+                     PvEFeatures.HasToOpenJob = true;
++                    weaveID.Clear();
+                 }
+                 jobID = value;
+             }
+         }
+ 
++        private static readonly List<uint> weaveID = [];
++
++        public static uint? WeaveID
++        {
++            get => weaveID.Count == 0 ? null : weaveID.FirstOrDefault();
++            set
++            {
++                if (value == null) return;
++                weaveID.Toggle((uint)value);
++                Svc.Chat.Print(new SeStringBuilder()
++                    .AddUiForeground(
++                        weaveID.Contains((uint)value) ? "Queue" : "Remove",
++                        weaveID.Contains((uint)value) ? (ushort)UIColor.Green : (ushort)UIColor.Red)
++                    .Append($" {ActionWatching.GetActionName((uint)value)}")
++                    .Build());
++            }
++        }
++
+         /// <summary> Initializes a new instance of the <see cref="XIVSlothCombo"/> class. </summary>
+         /// <param name="pluginInterface"> Dalamud plugin interface. </param>
+         public XIVSlothCombo(IDalamudPluginInterface pluginInterface)
+@@ -625,6 +645,15 @@
+ 
+                         break;
+                     }
++                case "weave":
++                {
++                    if (uint.TryParse(argumentsParts[1], out var actionID))
++                    {
++                        WeaveID = actionID;
++                    }
++
++                    break;
++                }
+                 default:
+                     ConfigWindow.IsOpen = !ConfigWindow.IsOpen;
+                     PvEFeatures.HasToOpenJob = true;
+Index: XIVSlothCombo/CustomCombo/CustomCombo.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/XIVSlothCombo/CustomCombo/CustomCombo.cs b/XIVSlothCombo/CustomCombo/CustomCombo.cs
+--- a/XIVSlothCombo/CustomCombo/CustomCombo.cs	(revision f3f5a1c287fef7cd268a6adaa2493a5acc61a8d7)
++++ b/XIVSlothCombo/CustomCombo/CustomCombo.cs	(date 1732069978841)
+@@ -62,7 +62,16 @@
+                 return false;
+ 
+             OptionalTarget = targetOverride;
+-            uint resultingActionID = Invoke(actionID, lastComboMove, comboTime, level);
++            uint resultingActionID = 0;
++            if ((CanWeave(actionID) || !HasTarget()) && WeaveID != null)
++            {
++                if (JustUsed(WeaveID.Value) || !HasCharges(WeaveID.Value))
++                    WeaveID = WeaveID;
++                else
++                    resultingActionID = WeaveID.Value;
++            }
++            else
++                resultingActionID = Invoke(actionID, lastComboMove, comboTime, level);
+             //Dalamud.Logging.PluginLog.Debug(resultingActionID.ToString());
+ 
+             if (resultingActionID == 0 || actionID == resultingActionID)
