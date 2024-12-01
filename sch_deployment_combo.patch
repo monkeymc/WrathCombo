@@ -1,0 +1,23 @@
+Subject: [PATCH] sch_deployment_combo
+---
+Index: XIVSlothCombo/Combos/PvE/SCH/SCH.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/XIVSlothCombo/Combos/PvE/SCH/SCH.cs b/XIVSlothCombo/Combos/PvE/SCH/SCH.cs
+--- a/XIVSlothCombo/Combos/PvE/SCH/SCH.cs	(revision 77863037fe7beda5bd066b06bf96b972526da8f1)
++++ b/XIVSlothCombo/Combos/PvE/SCH/SCH.cs	(date 1732978132668)
+@@ -229,6 +229,12 @@
+             {
+                 if (actionID is DeploymentTactics && ActionReady(DeploymentTactics))
+                 {
++                    if (IsEnabled(CustomComboPreset.SCH_DeploymentTactics_Recitation) && ActionReady(FeyIllumination) && HasPetPresent())
++                        return FeyIllumination;
++                    
++                    if (IsEnabled(CustomComboPreset.SCH_DeploymentTactics_Recitation) && ActionReady(Protraction))
++                        return Protraction;
++
+                     //Grab our target (Soft->Hard->Self)
+                     IGameObject? healTarget = GetHealTarget(Config.SCH_DeploymentTactics_Adv && Config.SCH_DeploymentTactics_UIMouseOver);
+ 

@@ -1,0 +1,539 @@
+Subject: [PATCH] brd_combo
+---
+Index: XIVSlothCombo/Combos/PvE/BRD/BRD.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/XIVSlothCombo/Combos/PvE/BRD/BRD.cs b/XIVSlothCombo/Combos/PvE/BRD/BRD.cs
+--- a/XIVSlothCombo/Combos/PvE/BRD/BRD.cs	(revision 77863037fe7beda5bd066b06bf96b972526da8f1)
++++ b/XIVSlothCombo/Combos/PvE/BRD/BRD.cs	(date 1732785602174)
+@@ -6,6 +6,7 @@
+ using XIVSlothCombo.Core;
+ using XIVSlothCombo.CustomComboNS;
+ using XIVSlothCombo.Data;
++using XIVSlothCombo.Extensions;
+ 
+ namespace XIVSlothCombo.Combos.PvE
+ {
+@@ -52,10 +53,10 @@
+             public const ushort
+                 RagingStrikes = 125,
+                 Barrage = 128,
+-                MagesBallad = 135,
+-                ArmysPaeon = 137,
++                MagesBallad = 2217,
++                ArmysPaeon = 2218,
+                 BattleVoice = 141,
+-                WanderersMinuet = 865,
++                WanderersMinuet = 2216,
+                 Troubadour = 1934,
+                 BlastArrowReady = 2692,
+                 RadiantFinale = 2722,
+@@ -577,303 +578,275 @@
+             internal static byte subStep = 0;
+             internal static bool usedStraightShotReady = false;
+             internal static bool usedPitchPerfect = false;
++
+             internal delegate bool DotRecast(int value);
+ 
+             protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+             {
+                 if (actionID is HeavyShot or BurstShot)
+                 {
+-                    BRDGauge? gauge = GetJobGauge<BRDGauge>();
+-                    bool canWeave = CanWeave(actionID) && !ActionWatching.HasDoubleWeaved();
+-                    bool canWeaveBuffs = CanWeave(actionID, 0.6) && !ActionWatching.HasDoubleWeaved();
+-                    bool canWeaveDelayed = CanDelayedWeave(actionID, 0.9) && !ActionWatching.HasDoubleWeaved();
+-                    bool songNone = gauge.Song == Song.NONE;
+-                    bool songWanderer = gauge.Song == Song.WANDERER;
+-                    bool songMage = gauge.Song == Song.MAGE;
+-                    bool songArmy = gauge.Song == Song.ARMY;
+-                    bool canInterrupt = CanInterruptEnemy() && IsOffCooldown(All.HeadGraze);
+-                    int targetHPThreshold = PluginConfiguration.GetCustomIntValue(Config.BRD_NoWasteHPPercentage);
+-                    bool isEnemyHealthHigh = !IsEnabled(CustomComboPreset.BRD_Adv_NoWaste) || GetTargetHPPercent() > targetHPThreshold;
++                    var gauge = GetJobGauge<BRDGauge>();
++                    int targetHpThreshold = PluginConfiguration.GetCustomIntValue(Config.BRD_NoWasteHPPercentage);
++                    bool isEnemyHealthHigh = !IsEnabled(CustomComboPreset.BRD_Adv_NoWaste) ||
++                                             GetTargetHPPercent() > targetHpThreshold;
++
++                    // song base on battle voice (3-6-9)
++                    const int toGreen = 3 + 3;
++                    const int toBlue = (120 + 5) - (45 - 3);
++                    const int toYellow = toBlue - (45 - 6);
+ 
+-                    if (!InCombat() && (inOpener || openerFinished))
++                    var battleVoice = GetCooldownRemainingTime(BattleVoice);
++
++                    if (IsEnabled(CustomComboPreset.BRD_Adv_Interrupt) && CanInterruptEnemy() &&
++                        ActionReady(All.HeadGraze))
+                     {
+-                        openerFinished = false;
+-                    }
+-
+-                    if (IsEnabled(CustomComboPreset.BRD_Adv_Interrupt) && canInterrupt)
+                         return All.HeadGraze;
+-
+-                    if (IsEnabled(CustomComboPreset.BRD_Variant_Cure) && IsEnabled(Variant.VariantCure) && PlayerHealthPercentageHp() <= GetOptionValue(Config.BRD_VariantCure))
+-                        return Variant.VariantCure;
++                    }
+ 
+-                    if (IsEnabled(CustomComboPreset.BRD_Variant_Rampart) &&
+-                        IsEnabled(Variant.VariantRampart) &&
+-                        IsOffCooldown(Variant.VariantRampart) &&
+-                        canWeave)
+-                        return Variant.VariantRampart;
+-
+-                    if (IsEnabled(CustomComboPreset.BRD_Adv_Song) && isEnemyHealthHigh)
++                    if (IsEnabled(CustomComboPreset.BRD_Adv_Song) && InCombat() && CanWeave(actionID) || !HasTarget())
+                     {
+-                        int songTimerInSeconds = gauge.SongTimer / 1000;
+-
+-                        // Limit optimisation to when you are high enough level to benefit from it.
+                         if (LevelChecked(WanderersMinuet))
+                         {
+-                            // 43s of Wanderer's Minute, ~36s of Mage's Ballad, and ~43s of Army's Paeon    
+-                            bool minuetReady = IsOffCooldown(WanderersMinuet);
+-                            bool balladReady = IsOffCooldown(MagesBallad);
+-                            bool paeonReady = IsOffCooldown(ArmysPaeon);
+-
+-                            if (ActionReady(EmpyrealArrow) && JustUsed(WanderersMinuet))
+-                                return EmpyrealArrow;
+-
+-                            if (canWeave)
++                            switch (battleVoice)
+                             {
+-                                if (songNone)
+-                                {
+-                                    // Logic to determine first song
+-                                    if (minuetReady && !(JustUsed(MagesBallad) || JustUsed(ArmysPaeon)))
+-                                        return WanderersMinuet;
+-                                    if (balladReady && !(JustUsed(WanderersMinuet) || JustUsed(ArmysPaeon)))
+-                                        return MagesBallad;
+-                                    if (paeonReady && !(JustUsed(MagesBallad) || JustUsed(WanderersMinuet)))
+-                                        return ArmysPaeon;
+-                                }
+-
+-                                if (songWanderer)
+-                                {
+-                                    if (songTimerInSeconds <= 3 && gauge.Repertoire > 0) // Spend any repertoire before switching to next song
+-                                        return OriginalHook(PitchPerfect);
+-                                    if (songTimerInSeconds <= 3 && balladReady)          // Move to Mage's Ballad if <= 3 seconds left on song
+-                                        return MagesBallad;
+-                                }
+-
+-                                if (songMage)
+-                                {
+-
+-                                    // Move to Army's Paeon if <= 3 seconds left on song
+-                                    if (songTimerInSeconds <= 3 && paeonReady)
+-                                    {
+-                                        // Special case for Empyreal Arrow: it must be cast before you change to it to avoid drift!
+-                                        if (ActionReady(EmpyrealArrow))
+-                                            return EmpyrealArrow;
+-                                        return ArmysPaeon;
+-                                    }
+-                                }
+-                            }
+-
+-                            if (songArmy && canWeaveDelayed)
+-                            {
+-                                // Move to Wanderer's Minuet if <= 12 seconds left on song or WM off CD and have 4 repertoires of AP
+-                                if (songTimerInSeconds <= 12 || (minuetReady && gauge.Repertoire == 4))
+-                                    return WanderersMinuet;
+-                            }
+-                        }
+-                        else if (songTimerInSeconds <= 3 && canWeave)
+-                        {
+-                            bool balladReady = LevelChecked(MagesBallad) && IsOffCooldown(MagesBallad);
+-                            bool paeonReady = LevelChecked(ArmysPaeon) && IsOffCooldown(ArmysPaeon);
+-
+-                            if (balladReady)
++                                case <= toGreen when ActionReady(WanderersMinuet):
++                                    return WanderersMinuet;
++                                case > 0 and <= toBlue when ActionReady(MagesBallad):
++                                    return MagesBallad;
++                                case > 0 and <= toYellow when ActionReady(ArmysPaeon):
++                                    return ArmysPaeon;
++                            }
++                        }
++                        else
++                        {
++                            if (ActionReady(MagesBallad))
++                            {
+                                 return MagesBallad;
+-                            if (paeonReady)
++                            }
++
++                            if (ActionReady(ArmysPaeon))
++                            {
+                                 return ArmysPaeon;
++                            }
+                         }
+                     }
+ 
+-                    if (IsEnabled(CustomComboPreset.BRD_Adv_Buffs) && (!songNone || !LevelChecked(MagesBallad)) && isEnemyHealthHigh)
++                    if (IsEnabled(CustomComboPreset.BRD_Adv_Buffs) && CanWeave(actionID))
+                     {
+-                        bool radiantReady = LevelChecked(RadiantFinale) && IsOffCooldown(RadiantFinale) && TargetHasEffect(Debuffs.CausticBite) && TargetHasEffect(Debuffs.Stormbite);
+-                        bool ragingReady = LevelChecked(RagingStrikes) && IsOffCooldown(RagingStrikes);
+-                        bool battleVoiceReady = LevelChecked(BattleVoice) && IsOffCooldown(BattleVoice);
+-                        bool barrageReady = LevelChecked(Barrage) && IsOffCooldown(Barrage);
+-                        float battleVoiceCD = GetCooldownRemainingTime(BattleVoice);
+-                        float ragingCD = GetCooldownRemainingTime(RagingStrikes);
+-
+-                        if (canWeaveDelayed && IsEnabled(CustomComboPreset.BRD_Adv_BuffsRadiant) && radiantReady &&
+-                           (Array.TrueForAll(gauge.Coda, SongIsNotNone) || Array.Exists(gauge.Coda, SongIsWandererMinuet))
+-                           && (battleVoiceCD < 3 || ActionReady(BattleVoice)) && (ragingCD < 3 || ActionReady(RagingStrikes)))
+-                            return RadiantFinale;
++                        if ((ActionReady(BattleVoice) || !RadiantFinale.LevelChecked()) &&
++                            HasEffect(Buffs.WanderersMinuet) &&
++                            ((TargetHasEffect(Debuffs.VenomousBite) &&
++                              GetDebuffRemainingTime(Debuffs.VenomousBite) < 43)
++                             || (TargetHasEffect(Debuffs.CausticBite) &&
++                                 GetDebuffRemainingTime(Debuffs.CausticBite) < 43)))
++                        {
++                            if (ActionReady(RadiantFinale))
++                            {
++                                return RadiantFinale;
++                            }
+ 
+-                        if (canWeaveBuffs && battleVoiceReady && (HasEffect(Buffs.RadiantFinale) || !LevelChecked(RadiantFinale)))
+-                            return BattleVoice;
++                            if (ActionReady(BattleVoice))
++                            {
++                                return BattleVoice;
++                            }
++                        }
+ 
+-                        if (canWeaveBuffs && ragingReady && (HasEffect(Buffs.RadiantFinale) || !LevelChecked(RadiantFinale)))
++                        if (ActionReady(RagingStrikes) && (HasEffect(Buffs.BattleVoice) || !BattleVoice.LevelChecked()))
++                        {
+                             return RagingStrikes;
++                        }
+ 
+-                        //removed requirement to not have hawks eye, it is better to maybe lose 60 potency than allow it to drift a 1000 potency gain out of the window
+-                        if (canWeaveBuffs && barrageReady && HasEffect(Buffs.RagingStrikes))
++                        if (HasEffect(Buffs.RagingStrikes))
+                         {
+-                            if (LevelChecked(RadiantFinale) && HasEffect(Buffs.RadiantFinale))
++                            if (ActionReady(Barrage) && !HasEffect(Buffs.HawksEye))
++                            {
+                                 return Barrage;
+-                            else if (LevelChecked(BattleVoice) && HasEffect(Buffs.BattleVoice))
+-                                return Barrage;
+-                            else if (!LevelChecked(BattleVoice) && HasEffect(Buffs.RagingStrikes))
+-                                return Barrage;
++                            }
+                         }
+                     }
+ 
+-                    if (canWeave && IsEnabled(CustomComboPreset.BRD_ST_Adv_oGCD))
++                    var ragingStrikes = HasEffect(Buffs.RagingStrikes) &&
++                                        GetBuffRemainingTime(Buffs.RagingStrikes) < 19.5;
++
++                    if (IsEnabled(CustomComboPreset.BRD_ST_Adv_oGCD) && CanWeave(actionID))
+                     {
+-                        float battleVoiceCD = GetCooldownRemainingTime(BattleVoice);
+-                        float empyrealCD = GetCooldownRemainingTime(EmpyrealArrow);
+-                        float ragingCD = GetCooldownRemainingTime(RagingStrikes);
+-                        float radiantCD = GetCooldownRemainingTime(RadiantFinale);
+-
+                         if (ActionReady(EmpyrealArrow))
++                        {
+                             return EmpyrealArrow;
+-
+-                        if (LevelChecked(PitchPerfect) && songWanderer &&
+-                            (gauge.Repertoire == 3 || (LevelChecked(EmpyrealArrow) && gauge.Repertoire == 2 && empyrealCD < 2)))
+-                            return OriginalHook(PitchPerfect);
++                        }
+ 
+                         if (ActionReady(Sidewinder))
+                         {
+-                            if (IsEnabled(CustomComboPreset.BRD_Adv_Pooling))
++                            if (ragingStrikes)
+                             {
+-                                if (songWanderer)
+-                                {
+-                                    if ((HasEffect(Buffs.RagingStrikes) || ragingCD > 10) &&
+-                                        (HasEffect(Buffs.BattleVoice) || battleVoiceCD > 10) &&
+-                                        (HasEffect(Buffs.RadiantFinale) || radiantCD > 10 ||
+-                                        !LevelChecked(RadiantFinale)))
+-                                        return Sidewinder;
+-                                }
+-                                else return Sidewinder;
++                                return Sidewinder;
++                            }
++
++                            if (GetCooldownRemainingTime(RagingStrikes) > 45)
++                            {
++                                return Sidewinder;
+                             }
+-                            else return Sidewinder;
+                         }
+ 
++                        if (LevelChecked(PitchPerfect) && HasEffect(Buffs.WanderersMinuet) &&
++                            (gauge.Repertoire == 3 || (battleVoice is > 0 and <= toBlue && gauge.Repertoire > 0)))
++                        {
++                            return OriginalHook(PitchPerfect);
++                        }
+ 
+-                        if (ActionReady(Bloodletter) && !(WasLastAction(Bloodletter) || WasLastAction(HeartbreakShot)) && (empyrealCD > 1 || !LevelChecked(EmpyrealArrow)))
++                        if (Bloodletter.LevelChecked() && HasCharges(Bloodletter))
+                         {
+-                            uint bloodletterCharges = GetRemainingCharges(Bloodletter);
+-
+-                            if (IsEnabled(CustomComboPreset.BRD_Adv_Pooling) && LevelChecked(WanderersMinuet) && TraitLevelChecked(Traits.EnhancedBloodletter))
++                            var max = TraitLevelChecked(Traits.EnhancedBloodletter) ? 3 : 2;
++                            if (HasCharges(Bloodletter))
+                             {
+-                                if (songWanderer)
++                                if (ragingStrikes)
+                                 {
+-                                    if (((HasEffect(Buffs.RagingStrikes) || ragingCD > 10) &&
+-                                        (HasEffect(Buffs.BattleVoice) || battleVoiceCD > 10 ||
+-                                        !LevelChecked(BattleVoice)) &&
+-                                        (HasEffect(Buffs.RadiantFinale) || radiantCD > 10 ||
+-                                        !LevelChecked(RadiantFinale)) &&
+-                                        bloodletterCharges > 0) || bloodletterCharges > 2)
+-                                        return OriginalHook(Bloodletter);
++                                    return OriginalHook(Bloodletter);
+                                 }
+ 
+-                                if (songArmy && (bloodletterCharges == 3 || ((gauge.SongTimer / 1000) > 30 && bloodletterCharges > 0)))
++                                if (HasEffect(Buffs.WanderersMinuet) && IsOnCooldown(RagingStrikes) &&
++                                    GetCooldownElapsed(RagingStrikes) < 45)
++                                {
+                                     return OriginalHook(Bloodletter);
+-                                if (songMage && bloodletterCharges > 0)
+-                                    return OriginalHook(Bloodletter);
+-                                if (songNone && bloodletterCharges == 3)
+-                                    return OriginalHook(Bloodletter);
++                                }
++                            }
++
++                            if (HasEffect(Buffs.MagesBallad) && max - GetRemainingCharges(Bloodletter) == 1)
++                            {
++                                return OriginalHook(Bloodletter);
++                            }
++
++                            if (GetRemainingCharges(Bloodletter) == max)
++                            {
++                                return OriginalHook(Bloodletter);
+                             }
+-                            else if (bloodletterCharges > 0)
+-                                return OriginalHook(Bloodletter);
+                         }
++                    }
+ 
+-                        // healing - please move if not appropriate priority
+-                        if (IsEnabled(CustomComboPreset.BRD_ST_SecondWind))
++                    if (ragingStrikes)
++                    {
++                        if (gauge.SoulVoice == 100 && HasBattleTarget())
+                         {
+-                            if (PlayerHealthPercentageHp() <= PluginConfiguration.GetCustomIntValue(Config.BRD_STSecondWindThreshold) && ActionReady(All.SecondWind))
+-                                return All.SecondWind;
++                            return ApexArrow;
+                         }
+-                    }
+-                    //Moved below weaves bc roobert says it is blocking his weaves from happening
+-                    if (HasEffect(Buffs.RadiantEncoreReady) && !JustUsed(RadiantFinale) && GetCooldownElapsed(RadiantFinale) >= 4.2f && IsEnabled(CustomComboPreset.BRD_Adv_BuffsEncore))
+-                        return OriginalHook(RadiantEncore);
++
++                        if ((IsOffCooldown(Barrage) && HasEffect(Buffs.HawksEye)) || HasEffect(Buffs.Barrage))
++                        {
++                            return OriginalHook(StraightShot);
++                        }
++
++                        if (HasEffect(Buffs.BlastArrowReady))
++                        {
++                            return BlastArrow;
++                        }
++
++                        if (HasEffect(Buffs.RadiantEncoreReady))
++                        {
++                            return OriginalHook(RadiantEncore);
++                        }
+ 
+-                    if (isEnemyHealthHigh)
+-                    {
+-                        bool venomous = TargetHasEffect(Debuffs.VenomousBite);
+-                        bool windbite = TargetHasEffect(Debuffs.Windbite);
+-                        bool caustic = TargetHasEffect(Debuffs.CausticBite);
+-                        bool stormbite = TargetHasEffect(Debuffs.Stormbite);
+-                        float venomRemaining = GetDebuffRemainingTime(Debuffs.VenomousBite);
+-                        float windRemaining = GetDebuffRemainingTime(Debuffs.Windbite);
+-                        float causticRemaining = GetDebuffRemainingTime(Debuffs.CausticBite);
+-                        float stormRemaining = GetDebuffRemainingTime(Debuffs.Stormbite);
+-                        float ragingStrikesDuration = GetBuffRemainingTime(Buffs.RagingStrikes);
+-                        float radiantFinaleDuration = GetBuffRemainingTime(Buffs.RadiantFinale);
+-                        int ragingJawsRenewTime = PluginConfiguration.GetCustomIntValue(Config.BRD_RagingJawsRenewTime);
++                        if (HasEffect(Buffs.ResonantArrowReady))
++                        {
++                            return ResonantArrow;
++                        }
++                    }
++
++                    bool venomous = TargetHasEffect(Debuffs.VenomousBite);
++                    bool windbite = TargetHasEffect(Debuffs.Windbite);
++                    bool caustic = TargetHasEffect(Debuffs.CausticBite);
++                    bool stormbite = TargetHasEffect(Debuffs.Stormbite);
++                    float venomRemaining = GetDebuffRemainingTime(Debuffs.VenomousBite);
++                    float windRemaining = GetDebuffRemainingTime(Debuffs.Windbite);
++                    float causticRemaining = GetDebuffRemainingTime(Debuffs.CausticBite);
++                    float stormRemaining = GetDebuffRemainingTime(Debuffs.Stormbite);
++                    float ragingStrikesDuration = GetBuffRemainingTime(Buffs.RagingStrikes);
++                    float radiantFinaleDuration = GetBuffRemainingTime(Buffs.RadiantFinale);
++                    int ragingJawsRenewTime = PluginConfiguration.GetCustomIntValue(Config.BRD_RagingJawsRenewTime);
+ 
+-                        DotRecast poisonRecast = delegate (int duration)
+-                        {
+-                            return (venomous && venomRemaining < duration) || (caustic && causticRemaining < duration);
+-                        };
++                    DotRecast poisonRecast = delegate(int duration)
++                    {
++                        return (venomous && venomRemaining < duration) ||
++                                (caustic && causticRemaining < duration);
++                    };
+ 
+-                        DotRecast windRecast = delegate (int duration)
+-                        {
+-                            return (windbite && windRemaining < duration) || (stormbite && stormRemaining < duration);
+-                        };
++                    DotRecast windRecast = delegate(int duration)
++                    {
++                        return (windbite && windRemaining < duration) ||
++                                (stormbite && stormRemaining < duration);
++                    };
+ 
+-                        if (IsEnabled(CustomComboPreset.BRD_Adv_DoT))
++                    if (ragingStrikes)
++                    {
++                        if (ActionReady(IronJaws) 
++                            && !WasLastAction(IronJaws) 
++                            && !openerFinished)
+                         {
+-                            if (ActionReady(IronJaws) && IsEnabled(CustomComboPreset.BRD_Adv_RagingJaws) && HasEffect(Buffs.RagingStrikes) &&
+-                            !WasLastAction(IronJaws) && ragingStrikesDuration < ragingJawsRenewTime && poisonRecast(35) && windRecast(35))
+-                            {
+-                                openerFinished = true;
+-                                return IronJaws;
+-                            }
++                            return IronJaws;
++                        }
++
++                        if (WasLastAction(IronJaws))
++                        {
++                            openerFinished = true;
++                        }
++
++                        if (HasEffect(Buffs.HawksEye) || HasEffect(Buffs.Barrage))
++                        {
++                            return OriginalHook(StraightShot);
++                        }
++                        else
++                        {
++                            return actionID;
++                        }
++                    }
++                    else
++                    {
++                        openerFinished = false;
++                    }
+ 
+-                            if (LevelChecked(Stormbite) && !stormbite)
+-                                return Stormbite;
+-                            if (LevelChecked(CausticBite) && !caustic)
+-                                return CausticBite;
+-                            if (LevelChecked(Windbite) && !windbite && !LevelChecked(Stormbite))
+-                                return Windbite;
+-                            if (LevelChecked(VenomousBite) && !venomous && !LevelChecked(CausticBite))
+-                                return VenomousBite;
++                    if (LevelChecked(Stormbite) && !stormbite)
++                        return Stormbite;
++                    if (LevelChecked(CausticBite) && !caustic)
++                        return CausticBite;
++                    if (LevelChecked(Windbite) && !windbite && !LevelChecked(Stormbite))
++                        return Windbite;
++                    if (LevelChecked(VenomousBite) && !venomous && !LevelChecked(CausticBite))
++                        return VenomousBite;
+ 
+-                            if (ActionReady(IronJaws) && poisonRecast(4) && windRecast(4))
+-                            {
+-                                openerFinished = true;
+-                                return IronJaws;
+-                            }
+-                            if (!LevelChecked(IronJaws))
+-                            {
+-                                if (windbite && windRemaining < 4)
+-                                {
+-                                    openerFinished = true;
+-                                    return Windbite;
+-                                }
++                    if (ActionReady(IronJaws) && poisonRecast(6) && windRecast(6))
++                    {
++                        return IronJaws;
++                    }
++
++                    if (!LevelChecked(IronJaws))
++                    {
++                        if (windbite && windRemaining < 6)
++                        {
++                            return Windbite;
++                        }
+ 
+-                                if (venomous && venomRemaining < 4)
+-                                {
+-                                    openerFinished = true;
+-                                    return VenomousBite;
+-                                }
+-                            }
+-                        }
++                        if (venomous && venomRemaining < 6)
++                        {
++                            return VenomousBite;
++                        }
++                    }
++
++                    if (HasEffect(Buffs.MagesBallad) && gauge.SoulVoice >= 80 && HasBattleTarget() &&
++                        GetTargetHPPercent() > 0.1)
++                    {
++                        return ApexArrow;
+                     }
+ 
+-                    if (IsEnabled(CustomComboPreset.BRD_ST_ApexArrow))
++                    if (HasEffect(Buffs.BlastArrowReady) && (HasEffect(Buffs.MagesBallad) ||
++                                                             HasEffect(Buffs.ArmysPaeon) ||
++                                                             GetBuffRemainingTime(Buffs.BlastArrowReady) < 6))
+                     {
+-                        if (LevelChecked(BlastArrow) && HasEffect(Buffs.BlastArrowReady))
+-                            return BlastArrow;
+-
+-                        if (LevelChecked(ApexArrow))
+-                        {
+-                            int songTimerInSeconds = gauge.SongTimer / 1000;
+-
+-                            if (songMage && gauge.SoulVoice == 100)
+-                                return ApexArrow;
+-                            if (songMage && gauge.SoulVoice >= 80 &&
+-                                songTimerInSeconds > 18 && songTimerInSeconds < 22)
+-                                return ApexArrow;
+-                            if (songWanderer && HasEffect(Buffs.RagingStrikes) && HasEffect(Buffs.BattleVoice) &&
+-                                (HasEffect(Buffs.RadiantFinale) || !LevelChecked(RadiantFinale)) && gauge.SoulVoice >= 80)
+-                                return ApexArrow;
+-                        }
++                        return BlastArrow;
+                     }
+ 
+                     if (HasEffect(Buffs.HawksEye) || HasEffect(Buffs.Barrage))
++                    {
+                         return OriginalHook(StraightShot);
+-
+-                    if (HasEffect(Buffs.ResonantArrowReady) && IsEnabled(CustomComboPreset.BRD_Adv_BuffsResonant))
+-                        return ResonantArrow;
+-
++                    }
+                 }
+ 
+                 return actionID;
