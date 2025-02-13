@@ -1,19 +1,21 @@
 Subject: [PATCH] ui toggle preset
 ---
-Index: XIVSlothCombo/Window/Functions/Presets.cs
+Index: WrathCombo/Window/Functions/Presets.cs
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/XIVSlothCombo/Window/Functions/Presets.cs b/XIVSlothCombo/Window/Functions/Presets.cs
---- a/XIVSlothCombo/Window/Functions/Presets.cs	(revision 9da62d42ac234d78027672e15b0d9b127cd73508)
-+++ b/XIVSlothCombo/Window/Functions/Presets.cs	(date 1732069251240)
-@@ -91,6 +91,8 @@
-                 ImGui.Separator();
-             }
- 
+diff --git a/WrathCombo/Window/Functions/Presets.cs b/WrathCombo/Window/Functions/Presets.cs
+--- a/WrathCombo/Window/Functions/Presets.cs	(revision c1a7d2921be2c3f884f8cce8cf00471ee88b68d7)
++++ b/WrathCombo/Window/Functions/Presets.cs	(date 1739440913055)
+@@ -108,7 +108,9 @@
+             if (info.Name.Contains(" - AoE") || info.Name.Contains(" - Sin"))
+                 if (P.UIHelper.PresetControlled(preset) is not null)
+                     P.UIHelper.ShowIPCControlledIndicatorIfNeeded(preset);
+-
++            
 +            if (ImGui.Button($"/wrath toggle {preset}")) ImGui.SetClipboardText($"/wrath toggle {preset}");
-+
-             if (ImGui.Checkbox($"{info.Name}###{preset}{i}", ref enabled))
++            
+             if (P.UIHelper.ShowIPCControlledCheckboxIfNeeded
+                     ($"{info.Name}###{preset}", ref enabled, preset, true))
              {
-                 if (enabled)
