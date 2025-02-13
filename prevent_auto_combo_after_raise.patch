@@ -1,21 +1,19 @@
 Subject: [PATCH] prevent auto combo after raise
 ---
-Index: XIVSlothCombo/AutoRotation/AutoRotationController.cs
+Index: WrathCombo/AutoRotation/AutoRotationController.cs
 IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
-diff --git a/XIVSlothCombo/AutoRotation/AutoRotationController.cs b/XIVSlothCombo/AutoRotation/AutoRotationController.cs
---- a/XIVSlothCombo/AutoRotation/AutoRotationController.cs	(revision f731ab8c36d8ad8dc4ccac182311df05383dfc2d)
-+++ b/XIVSlothCombo/AutoRotation/AutoRotationController.cs	(date 1733040749501)
-@@ -29,8 +29,8 @@
+diff --git a/WrathCombo/AutoRotation/AutoRotationController.cs b/WrathCombo/AutoRotation/AutoRotationController.cs
+--- a/WrathCombo/AutoRotation/AutoRotationController.cs	(revision 1b0957af61a00d3f7427d8846a91a123d74b01b5)
++++ b/WrathCombo/AutoRotation/AutoRotationController.cs	(date 1739442097645)
+@@ -69,7 +69,7 @@
          internal static void Run()
          {
-             var cfg = Service.Configuration.RotationConfig;
--
--            if (!cfg.Enabled || !Player.Available || Svc.Condition[ConditionFlag.Mounted])
-+            
-+            if (!cfg.Enabled || !Player.Available || Svc.Condition[ConditionFlag.Mounted] || Player.Status.Any(it => it.SourceId == 418))
+             cfg ??= new AutoRotationConfigIPCWrapper(Service.Configuration.RotationConfig);
+-            if (!cfg.Enabled || !Player.Available || Player.Object.IsDead || Svc.Condition[ConditionFlag.Mounted] || !EzThrottler.Throttle("Autorot", cfg.Throttler))
++            if (!cfg.Enabled || !Player.Available || Player.Object.IsDead || Svc.Condition[ConditionFlag.Mounted] || !EzThrottler.Throttle("Autorot", cfg.Throttler) || HasEffect(418))
                  return;
  
-             if (Player.Object.CurrentCastTime > 0) return;
+             if (cfg.HealerSettings.PreEmptiveHoT && Player.Job is Job.CNJ or Job.WHM or Job.AST)
