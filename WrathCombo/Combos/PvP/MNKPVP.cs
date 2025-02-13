@@ -43,12 +43,12 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.MNKPvP_Burst;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is DragonKick or TwinSnakes or Demolish or LeapingOpo or RisingRaptor or PouncingCoeurl or PhantomRush)
                 {
 
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
                         if (IsEnabled(CustomComboPreset.MNKPvP_Burst_RisingPhoenix))
                         {
@@ -67,7 +67,7 @@ namespace WrathCombo.Combos.PvP
                         if (IsEnabled(CustomComboPreset.MNKPvP_Burst_WindsReply) && InActionRange(WindsReply) && IsOffCooldown(WindsReply))
                             return WindsReply;
 
-                        if (CanWeave(actionID))
+                        if (CanWeave())
                         {
                                 if (IsEnabled(CustomComboPreset.MNKPvP_Burst_RiddleOfEarth) && HasEffect(Buffs.EarthResonance) && GetBuffRemainingTime(Buffs.EarthResonance) < 6)
                                 return OriginalHook(EarthsReply);

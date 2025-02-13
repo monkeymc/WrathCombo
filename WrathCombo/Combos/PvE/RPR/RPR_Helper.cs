@@ -1,308 +1,253 @@
 ﻿using Dalamud.Game.ClientState.JobGauge.Types;
-using ECommons.DalamudServices;
 using FFXIVClientStructs.FFXIV.Client.Game;
-using WrathCombo.Combos.JobHelpers.Enums;
-using WrathCombo.Data;
+using System.Collections.Generic;
+using WrathCombo.CustomComboNS;
+using WrathCombo.CustomComboNS.Functions;
 using static WrathCombo.CustomComboNS.Functions.CustomComboFunctions;
-
 namespace WrathCombo.Combos.PvE;
 
 internal partial class RPR
 {
-    public static RPROpenerLogic RPROpener = new();
+    internal static RPRGauge Gauge = GetJobGauge<RPRGauge>();
+    internal static RPROpenerMaxLevel1 Opener1 = new();
+    
+    internal static float GCD => GetCooldown(Slice).CooldownTotal;
 
-    public static RPRGauge Gauge = GetJobGauge<RPRGauge>();
+    internal static bool TrueNorthReady =>
+        TargetNeedsPositionals() &&
+        ActionReady(All.TrueNorth) &&
+        !HasEffect(All.Buffs.TrueNorth);
 
-    // RPR Gauge & Extensions
-    public static float GCD => GetCooldown(Slice).CooldownTotal;
-
-    public static bool trueNorthReady => TargetNeedsPositionals() && ActionReady(All.TrueNorth) &&
-                                         !HasEffect(All.Buffs.TrueNorth);
-
-    internal class RPROpenerLogic
+    internal static WrathOpener Opener()
     {
-        private OpenerState currentState = OpenerState.PrePull;
+        if (Opener1.LevelChecked)
+            return Opener1;
 
-        public uint OpenerStep = 1;
+        return WrathOpener.Dummy;
+    }
 
-        public uint PrePullStep;
+    internal static unsafe bool IsComboExpiring(float times)
+    {
+        float gcd = GetCooldown(Slice).CooldownTotal * times;
 
-        private static uint OpenerLevel => 100;
+        return ActionManager.Instance()->Combo.Timer != 0 && ActionManager.Instance()->Combo.Timer < gcd;
+    }
 
-        public static bool LevelChecked => LocalPlayer.Level >= OpenerLevel;
+    internal static bool IsDebuffExpiring(float times)
+    {
+        float gcd = GetCooldown(Slice).CooldownTotal * times;
 
-        private static bool CanOpener => HasCooldowns() && LevelChecked;
+        return TargetHasEffect(Debuffs.DeathsDesign) && GetDebuffRemainingTime(Debuffs.DeathsDesign) < gcd;
+    }
 
-        public OpenerState CurrentState
+    internal static bool UseEnshroud(RPRGauge gauge)
+    {
+        if (LevelChecked(Enshroud) && (gauge.Shroud >= 50 || HasEffect(Buffs.IdealHost)) &&
+            !HasEffect(Buffs.SoulReaver) && !HasEffect(Buffs.Executioner) &&
+            !HasEffect(Buffs.PerfectioParata) && !HasEffect(Buffs.Enshrouded))
         {
-            get => currentState;
-            set
-            {
-                if (value != currentState)
-                {
-                    if (value == OpenerState.PrePull) Svc.Log.Debug("Entered PrePull Opener");
-                    if (value == OpenerState.InOpener) OpenerStep = 1;
+            // Before Plentiful Harvest 
+            if (!LevelChecked(PlentifulHarvest))
+                return true;
 
-                    if (value == OpenerState.OpenerFinished || value == OpenerState.FailedOpener)
-                    {
-                        if (value == OpenerState.FailedOpener)
-                            Svc.Log.Information($"Opener Failed at step {OpenerStep}");
+            // Shroud in Arcane Circle 
+            if (HasEffect(Buffs.ArcaneCircle))
+                return true;
 
-                        ResetOpener();
-                    }
-                    if (value == OpenerState.OpenerFinished) Svc.Log.Information("Opener Finished");
+            // Prep for double Enshroud
+            if (LevelChecked(PlentifulHarvest) &&
+                GetCooldownRemainingTime(ArcaneCircle) <= GCD * 2 + 1.5)
+                return true;
 
-                    currentState = value;
-                }
-            }
+            //2nd part of Double Enshroud
+            if (LevelChecked(PlentifulHarvest) &&
+                JustUsed(PlentifulHarvest, 5))
+                return true;
+
+            //Natural Odd Minute Shrouds
+            if (!HasEffect(Buffs.ArcaneCircle) && !IsDebuffExpiring(5) &&
+                GetCooldownRemainingTime(ArcaneCircle) is >= 50 and <= 65)
+                return true;
+
+            // Correction for 2 min windows 
+            if (!HasEffect(Buffs.ArcaneCircle) && !IsDebuffExpiring(5) &&
+                gauge.Soul >= 90)
+                return true;
         }
 
-        private static bool HasCooldowns()
+        return false;
+    }
+
+    internal static bool UseShadowOfDeath()
+    {
+        if (LevelChecked(ShadowOfDeath) && !HasEffect(Buffs.SoulReaver) &&
+            !HasEffect(Buffs.Executioner) && !HasEffect(Buffs.PerfectioParata) &&
+            !HasEffect(Buffs.ImmortalSacrifice) && !IsComboExpiring(3) &&
+            !JustUsed(ShadowOfDeath))
+        {
+            //1st part double enshroud
+            if (LevelChecked(PlentifulHarvest) && HasEffect(Buffs.Enshrouded) &&
+                GetCooldownRemainingTime(ArcaneCircle) <= GCD * 2 + 1.5 && JustUsed(Enshroud))
+                return true;
+
+            //2nd part double enshroud
+            if (LevelChecked(PlentifulHarvest) && HasEffect(Buffs.Enshrouded) &&
+                (GetCooldownRemainingTime(ArcaneCircle) <= GCD || IsOffCooldown(ArcaneCircle)) &&
+                (JustUsed(VoidReaping) || JustUsed(CrossReaping)))
+                return true;
+
+            //lvl 88+ general use
+            if (LevelChecked(PlentifulHarvest) && !HasEffect(Buffs.Enshrouded) &&
+                (IsEnabled(CustomComboPreset.RPR_ST_SimpleMode) &&
+                 GetDebuffRemainingTime(Debuffs.DeathsDesign) <= 8 ||
+                 IsEnabled(CustomComboPreset.RPR_ST_AdvancedMode) &&
+                 GetDebuffRemainingTime(Debuffs.DeathsDesign) <= Config.RPR_SoDRefreshRange) &&
+                (GetCooldownRemainingTime(ArcaneCircle) > GCD * 8 || IsOffCooldown(ArcaneCircle)))
+                return true;
+
+            //below lvl 88 use
+            if (!LevelChecked(PlentifulHarvest) &&
+                (IsEnabled(CustomComboPreset.RPR_ST_SimpleMode) &&
+                 GetDebuffRemainingTime(Debuffs.DeathsDesign) <= 8 ||
+                 IsEnabled(CustomComboPreset.RPR_ST_AdvancedMode) &&
+                 GetDebuffRemainingTime(Debuffs.DeathsDesign) <= Config.RPR_SoDRefreshRange))
+                return true;
+        }
+
+        return false;
+    }
+
+    internal class RPROpenerMaxLevel1 : WrathOpener
+    {
+        public override int MinOpenerLevel => 100;
+
+        public override int MaxOpenerLevel => 109;
+
+        public override List<uint> OpenerActions { get; set; } =
+        [
+            ShadowOfDeath,
+            SoulSlice,
+            ArcaneCircle,
+            Gluttony,
+            ExecutionersGibbet,
+            ExecutionersGallows,
+            SoulSlice,
+            PlentifulHarvest,
+            Enshroud,
+            VoidReaping,
+            Sacrificium,
+            CrossReaping,
+            LemuresSlice,
+            VoidReaping,
+            CrossReaping,
+            LemuresSlice,
+            Communio,
+            Perfectio,
+            UnveiledGibbet,
+            Gibbet,
+            ShadowOfDeath,
+            Slice
+        ];
+        internal override UserData ContentCheckConfig => Config.RPR_Balance_Content;
+
+        public override bool HasCooldowns()
         {
             if (GetRemainingCharges(SoulSlice) < 2)
                 return false;
 
-            if (!ActionReady(ArcaneCircle))
+            if (!IsOffCooldown(ArcaneCircle))
                 return false;
 
-            if (!ActionReady(Gluttony))
+            if (!IsOffCooldown(Gluttony))
                 return false;
 
             return true;
         }
-
-        private bool DoPrePullSteps(ref uint actionID)
-        {
-            if (!LevelChecked) return false;
-
-            if (CanOpener && PrePullStep == 0) PrePullStep = 1;
-
-            if (!HasCooldowns()) PrePullStep = 0;
-
-            if (CurrentState == OpenerState.PrePull && PrePullStep > 0)
-            {
-                if (WasLastAction(ShadowOfDeath) && PrePullStep == 1) CurrentState = OpenerState.InOpener;
-                else if (PrePullStep == 1) actionID = ShadowOfDeath;
-
-                if (ActionWatching.CombatActions.Count > 2 && InCombat())
-                    CurrentState = OpenerState.FailedOpener;
-
-                return true;
-            }
-
-            PrePullStep = 0;
-
-            return false;
-        }
-
-        private bool DoOpener(ref uint actionID)
-        {
-            if (!LevelChecked) return false;
-
-            if (currentState == OpenerState.InOpener)
-            {
-                if (WasLastAction(SoulSlice) && OpenerStep == 1) OpenerStep++;
-                else if (OpenerStep == 1) actionID = SoulSlice;
-
-                if (WasLastAction(ArcaneCircle) && OpenerStep == 2) OpenerStep++;
-                else if (OpenerStep == 2) actionID = ArcaneCircle;
-
-                if (WasLastAction(Gluttony) && OpenerStep == 3) OpenerStep++;
-                else if (OpenerStep == 3) actionID = Gluttony;
-
-                if (WasLastAction(ExecutionersGibbet) && OpenerStep == 4) OpenerStep++;
-                else if (OpenerStep == 4) actionID = ExecutionersGibbet;
-
-                if (WasLastAction(ExecutionersGallows) && OpenerStep == 5) OpenerStep++;
-                else if (OpenerStep == 5) actionID = ExecutionersGallows;
-
-                if (WasLastAction(PlentifulHarvest) && OpenerStep == 6) OpenerStep++;
-                else if (OpenerStep == 6) actionID = PlentifulHarvest;
-
-                if (WasLastAction(Enshroud) && OpenerStep == 7) OpenerStep++;
-                else if (OpenerStep == 7) actionID = Enshroud;
-
-                if (WasLastAction(VoidReaping) && OpenerStep == 8) OpenerStep++;
-                else if (OpenerStep == 8) actionID = VoidReaping;
-
-                if (WasLastAction(Sacrificium) && OpenerStep == 9) OpenerStep++;
-                else if (OpenerStep == 9) actionID = Sacrificium;
-
-                if (WasLastAction(CrossReaping) && OpenerStep == 10) OpenerStep++;
-                else if (OpenerStep == 10) actionID = CrossReaping;
-
-                if (WasLastAction(LemuresSlice) && OpenerStep == 11) OpenerStep++;
-                else if (OpenerStep == 11) actionID = LemuresSlice;
-
-                if (WasLastAction(VoidReaping) && OpenerStep == 12) OpenerStep++;
-                else if (OpenerStep == 12) actionID = VoidReaping;
-
-                if (WasLastAction(CrossReaping) && OpenerStep == 13) OpenerStep++;
-                else if (OpenerStep == 13) actionID = CrossReaping;
-
-                if (WasLastAction(LemuresSlice) && OpenerStep == 14) OpenerStep++;
-                else if (OpenerStep == 14) actionID = LemuresSlice;
-
-                if (WasLastAction(Communio) && OpenerStep == 15) OpenerStep++;
-                else if (OpenerStep == 15) actionID = Communio;
-
-                if (WasLastAction(Perfectio) && OpenerStep == 16) OpenerStep++;
-                else if (OpenerStep == 16) actionID = Perfectio;
-
-                if (WasLastAction(SoulSlice) && OpenerStep == 17) OpenerStep++;
-                else if (OpenerStep == 17) actionID = SoulSlice;
-
-                if (WasLastAction(UnveiledGibbet) && OpenerStep == 18) OpenerStep++;
-                else if (OpenerStep == 18) actionID = UnveiledGibbet;
-
-                if (WasLastAction(Gibbet) && OpenerStep == 19) OpenerStep++;
-                else if (OpenerStep == 19) actionID = Gibbet;
-
-                if (WasLastAction(ShadowOfDeath) && OpenerStep == 20) OpenerStep++;
-                else if (OpenerStep == 20) actionID = ShadowOfDeath;
-
-                if (WasLastAction(Slice) && OpenerStep == 21) CurrentState = OpenerState.OpenerFinished;
-                else if (OpenerStep == 21) actionID = Slice;
-
-                if (ActionWatching.TimeSinceLastAction.TotalSeconds >= 5)
-                    CurrentState = OpenerState.FailedOpener;
-
-                if (((actionID == SoulSlice && GetRemainingCharges(SoulSlice) == 0) ||
-                     (actionID == ArcaneCircle && IsOnCooldown(ArcaneCircle)) ||
-                     (actionID == Gluttony && IsOnCooldown(Gluttony))) &&
-                    ActionWatching.TimeSinceLastAction.TotalSeconds >= 3)
-                {
-                    CurrentState = OpenerState.FailedOpener;
-
-                    return false;
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-
-        private void ResetOpener()
-        {
-            PrePullStep = 0;
-            OpenerStep = 0;
-        }
-
-        public bool DoFullOpener(ref uint actionID)
-        {
-            if (!LevelChecked)
-                return false;
-
-            if (CurrentState == OpenerState.PrePull)
-                if (DoPrePullSteps(ref actionID))
-                    return true;
-
-            if (CurrentState == OpenerState.InOpener)
-                if (DoOpener(ref actionID))
-                    return true;
-
-            if (!InCombat())
-            {
-                ResetOpener();
-                CurrentState = OpenerState.PrePull;
-            }
-
-            return false;
-        }
     }
 
-    internal class RPRHelper
+    #region ID's
+
+    public const byte JobID = 39;
+
+    public const uint
+
+        // Single Target
+        Slice = 24373,
+        WaxingSlice = 24374,
+        InfernalSlice = 24375,
+        ShadowOfDeath = 24378,
+        SoulSlice = 24380,
+
+        // AoE
+        SpinningScythe = 24376,
+        NightmareScythe = 24377,
+        WhorlOfDeath = 24379,
+        SoulScythe = 24381,
+
+        // Unveiled
+        Gibbet = 24382,
+        Gallows = 24383,
+        Guillotine = 24384,
+        UnveiledGibbet = 24390,
+        UnveiledGallows = 24391,
+        ExecutionersGibbet = 36970,
+        ExecutionersGallows = 36971,
+        ExecutionersGuillotine = 36972,
+
+        // Reaver
+        BloodStalk = 24389,
+        GrimSwathe = 24392,
+        Gluttony = 24393,
+
+        // Sacrifice
+        ArcaneCircle = 24405,
+        PlentifulHarvest = 24385,
+
+        // Enshroud
+        Enshroud = 24394,
+        Communio = 24398,
+        LemuresSlice = 24399,
+        LemuresScythe = 24400,
+        VoidReaping = 24395,
+        CrossReaping = 24396,
+        GrimReaping = 24397,
+        Sacrificium = 36969,
+        Perfectio = 36973,
+
+        // Miscellaneous
+        HellsIngress = 24401,
+        HellsEgress = 24402,
+        Regress = 24403,
+        Harpe = 24386,
+        Soulsow = 24387,
+        HarvestMoon = 24388;
+
+    public static class Buffs
     {
-        public static unsafe bool IsComboExpiring(float Times)
-        {
-            float GCD = GetCooldown(Slice).CooldownTotal * Times;
-
-            return ActionManager.Instance()->Combo.Timer != 0 && ActionManager.Instance()->Combo.Timer < GCD;
-        }
-        
-        public static bool IsDebuffExpiring(float Times)
-        {
-            float GCD = GetCooldown(Slice).CooldownTotal * Times;
-
-            return TargetHasEffect(Debuffs.DeathsDesign) && GetDebuffRemainingTime(Debuffs.DeathsDesign) < GCD;
-        }
-
-        public static bool UseEnshroud(RPRGauge gauge)
-        {
-            if (LevelChecked(Enshroud) && (gauge.Shroud >= 50 || HasEffect(Buffs.IdealHost)) &&
-                !HasEffect(Buffs.SoulReaver) && !HasEffect(Buffs.Executioner) &&
-                !HasEffect(Buffs.PerfectioParata) && !HasEffect(Buffs.Enshrouded))
-            {
-                // Before Plentiful Harvest 
-                if (!LevelChecked(PlentifulHarvest))
-                    return true;
-
-                // Shroud in Arcane Circle 
-                if (HasEffect(Buffs.ArcaneCircle))
-                    return true;
-
-                // Prep for double Enshroud
-                if (LevelChecked(PlentifulHarvest) &&
-                    GetCooldownRemainingTime(ArcaneCircle) <= GCD * 2 + 1.5)
-                    return true;
-
-                //2nd part of Double Enshroud
-                if (LevelChecked(PlentifulHarvest) &&
-                    JustUsed(PlentifulHarvest, 5))
-                    return true;
-
-                //Natural Odd Minute Shrouds
-                if (!HasEffect(Buffs.ArcaneCircle) && !IsDebuffExpiring(5) &&
-                    GetCooldownRemainingTime(ArcaneCircle) is >= 50 and <= 65)
-                    return true;
-
-                // Correction for 2 min windows 
-                if (!HasEffect(Buffs.ArcaneCircle) && !IsDebuffExpiring(5) &&
-                    gauge.Soul >= 90)
-                    return true;
-            }
-
-            return false;
-        }
-
-        public static bool UseShadowOfDeath()
-        {
-            if (LevelChecked(ShadowOfDeath) && !HasEffect(Buffs.SoulReaver) &&
-                !HasEffect(Buffs.Executioner) && !HasEffect(Buffs.PerfectioParata) &&
-                !HasEffect(Buffs.ImmortalSacrifice) && !IsComboExpiring(3) &&
-                !JustUsed(ShadowOfDeath))
-            {
-                //1st part double enshroud
-                if (LevelChecked(PlentifulHarvest) && HasEffect(Buffs.Enshrouded) &&
-                    GetCooldownRemainingTime(ArcaneCircle) <= GCD * 2 + 1.5 && JustUsed(Enshroud))
-                    return true;
-
-                //2nd part double enshroud
-                if (LevelChecked(PlentifulHarvest) && HasEffect(Buffs.Enshrouded) &&
-                    (GetCooldownRemainingTime(ArcaneCircle) <= GCD || IsOffCooldown(ArcaneCircle)) &&
-                    (JustUsed(VoidReaping) || JustUsed(CrossReaping)))
-                    return true;
-
-                //lvl 88+ general use
-                if (LevelChecked(PlentifulHarvest) && !HasEffect(Buffs.Enshrouded) &&
-                    ((IsEnabled(CustomComboPreset.RPR_ST_SimpleMode) &&
-                      GetDebuffRemainingTime(Debuffs.DeathsDesign) <= 8) ||
-                     (IsEnabled(CustomComboPreset.RPR_ST_AdvancedMode) &&
-                      GetDebuffRemainingTime(Debuffs.DeathsDesign) <= Config.RPR_SoDRefreshRange)) &&
-                    (GetCooldownRemainingTime(ArcaneCircle) > GCD * 8 || IsOffCooldown(ArcaneCircle)))
-                    return true;
-
-                //below lvl 88 use
-                if (!LevelChecked(PlentifulHarvest) &&
-                    ((IsEnabled(CustomComboPreset.RPR_ST_SimpleMode) &&
-                      GetDebuffRemainingTime(Debuffs.DeathsDesign) <= 8) ||
-                     (IsEnabled(CustomComboPreset.RPR_ST_AdvancedMode) &&
-                      GetDebuffRemainingTime(Debuffs.DeathsDesign) <= Config.RPR_SoDRefreshRange)))
-                    return true;
-            }
-
-            return false;
-        }
+        public const ushort
+            SoulReaver = 2587,
+            ImmortalSacrifice = 2592,
+            ArcaneCircle = 2599,
+            EnhancedGibbet = 2588,
+            EnhancedGallows = 2589,
+            EnhancedVoidReaping = 2590,
+            EnhancedCrossReaping = 2591,
+            EnhancedHarpe = 2845,
+            Enshrouded = 2593,
+            Soulsow = 2594,
+            Threshold = 2595,
+            BloodsownCircle = 2972,
+            IdealHost = 3905,
+            Oblatio = 3857,
+            Executioner = 3858,
+            PerfectioParata = 3860;
     }
+
+    public static class Debuffs
+    {
+        public const ushort
+            DeathsDesign = 2586;
+    }
+
+    #endregion
 }

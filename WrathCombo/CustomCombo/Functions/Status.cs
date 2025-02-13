@@ -1,6 +1,8 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.GameHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using System.Collections.Generic;
+using System.Linq;
 using WrathCombo.Data;
 using WrathCombo.Services;
 using Status = Dalamud.Game.ClientState.Statuses.Status;
@@ -80,10 +82,14 @@ namespace WrathCombo.CustomComboNS.Functions
         /// <returns> A value indicating if the effect exists. </returns>
         public static bool TargetHasEffectAny(ushort effectID) => FindTargetEffectAny(effectID) is not null;
 
+        public static bool TargetHasEffectAny(ushort effectID, IGameObject target) => FindTargetEffectAny(effectID) is not null;
+
         /// <summary> Finds an effect on the current target. The effect may be owned by anyone or unowned. </summary>
         /// <param name="effectID"> Status effect ID. </param>
         /// <returns> Status object or null. </returns>
         public static Status? FindTargetEffectAny(ushort effectID) => FindEffect(effectID, CurrentTarget, null);
+
+        public static Status? FindTargetEffectAny(ushort effectID, IGameObject target) => FindEffect(effectID, target, null);
 
         /// <summary> Finds an effect on the given object. </summary>
         /// <param name="effectID"> Status effect ID. </param>
@@ -182,7 +188,7 @@ namespace WrathCombo.CustomComboNS.Functions
         public static bool HasCleansableDebuff(IGameObject? OurTarget = null)
         {
             OurTarget ??= CurrentTarget;
-            if (HasFriendlyTarget(OurTarget) && (OurTarget is IBattleChara chara))
+            if ((OurTarget is IBattleChara chara))
             {
                 foreach (Status status in chara.StatusList)
                 {
@@ -210,6 +216,69 @@ namespace WrathCombo.CustomComboNS.Functions
             }
 
             return true;
+        }
+
+        private static List<uint> InvincibleStatuses = new()
+        {
+            151,
+            198,
+            325,
+            328,
+            385,
+            394,
+            469,
+            529,
+            592,
+            656,
+            671,
+            775,
+            776,
+            895,
+            969,
+            981,
+            1240,
+            1302,
+            1303,
+            1567,
+            1570,
+            1697,
+            1829,
+            1936,
+            2413,
+            2654,
+            3039,
+            3052,
+            3054,
+            4410,
+            4175
+        };
+
+        public static bool TargetIsInvincible(IGameObject target)
+        {
+            var tar = (target as IBattleChara);
+            bool invinceStatus = tar.StatusList.Any(y => InvincibleStatuses.Any(x => x == y.StatusId));
+            if (invinceStatus)
+                return true;
+
+            //Jeuno Ark Angel Encounter
+            if ((HasEffect(4192) && !tar.StatusList.Any(x => x.StatusId == 4193)) ||
+                (HasEffect(4194) && !tar.StatusList.Any(x => x.StatusId == 4195)) ||
+                (HasEffect(4196) && !tar.StatusList.Any(x => x.StatusId == 4197)))
+                return true;
+
+            // Yorha raid encounter
+            if ((GetAllianceGroup() != AllianceGroup.GroupA && tar.StatusList.Any(x => x.StatusId == 2409)) ||
+                (GetAllianceGroup() != AllianceGroup.GroupB && tar.StatusList.Any(x => x.StatusId == 2410)) ||
+                (GetAllianceGroup() != AllianceGroup.GroupC && tar.StatusList.Any(x => x.StatusId == 2411)))
+                return true;
+
+            // Omega
+            if ((tar.StatusList.Any(x => x.StatusId == 1674 || x.StatusId == 3454) && (HasEffect(1660) || HasEffect(3499))) ||
+                (tar.StatusList.Any(x => x.StatusId == 1675) && (HasEffect(1661) || HasEffect(3500))))
+                return true;
+
+
+            return false;
         }
     }
 }

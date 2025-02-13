@@ -2,6 +2,8 @@
 using Dalamud.Plugin.Services;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.GameHelpers;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +14,12 @@ namespace WrathCombo.CustomComboNS.Functions
     {
         private static DateTime combatStart = DateTime.Now;
         private static DateTime partyCombat = DateTime.Now;
+        private static DateTime? castFinishedAt;
+        private static uint castId;
         private static bool partyInCombat = false;
+
+        public delegate void OnCastInterruptedDelegate(uint interruptedAction);
+        public static event OnCastInterruptedDelegate? OnCastInterrupted;
 
         public static Dictionary<ulong, long> Deadtionary { get; set; } = new();
 
@@ -31,14 +38,42 @@ namespace WrathCombo.CustomComboNS.Functions
             Svc.Condition.ConditionChange += OnCombat;
             Svc.Framework.Update += UpdatePartyTimer;
             Svc.Framework.Update += UpdateDeadtionary;
+            Svc.Framework.Update += CheckInterruptedCasts;
+        }
+
+        private unsafe  static void CheckInterruptedCasts(IFramework framework)
+        {
+            if (Player.Available && Player.Object.CurrentCastTime > 0)
+            {
+                if (castFinishedAt is null)
+                {
+                    castId = Player.Object.CastActionId;
+                    var timeLeft = ((Player.Object.TotalCastTime - Player.Object.CurrentCastTime) * 1000f) - 500f;
+                    castFinishedAt = DateTime.Now + TimeSpan.FromMilliseconds(timeLeft);
+                }
+
+            }
+            else
+            {
+                if (castFinishedAt is not null)
+                {
+                    if (DateTime.Now < castFinishedAt)
+                    {
+                        OnCastInterrupted?.Invoke(castId);
+                    }
+                }
+
+                castFinishedAt = null;
+            }
         }
 
         private static void UpdateDeadtionary(IFramework framework)
         {
-            foreach (var member in GetPartyMembers().Where(x => x.IsDead))
+            if (!Player.Available) return;
+            foreach (var member in GetPartyMembers().Where(x => x.BattleChara.IsDead))
             {
-                if (!Deadtionary.ContainsKey(member.GameObjectId))
-                    Deadtionary[member.GameObjectId] = Environment.TickCount64;
+                if (!Deadtionary.ContainsKey(member.BattleChara.GameObjectId))
+                    Deadtionary[member.BattleChara.GameObjectId] = Environment.TickCount64;
             }
 
             var deadCopy = Deadtionary.ToList();
@@ -51,12 +86,13 @@ namespace WrathCombo.CustomComboNS.Functions
 
         private unsafe static void UpdatePartyTimer(IFramework framework)
         {
-            if (GetPartyMembers().Any(x => x.Struct()->InCombat) && !partyInCombat)
+            if (!Player.Available) return;
+            if (GetPartyMembers().Any(x => x.BattleChara.Struct()->InCombat) && !partyInCombat)
             {
                 partyInCombat = true;
                 partyCombat = DateTime.Now;
             }
-            else if (!GetPartyMembers().Any(x => x.Struct()->InCombat))
+            else if (!GetPartyMembers().Any(x => x.BattleChara.Struct()->InCombat))
             {
                 partyInCombat = false;
             }
@@ -67,6 +103,7 @@ namespace WrathCombo.CustomComboNS.Functions
             Svc.Condition.ConditionChange -= OnCombat;
             Svc.Framework.Update -= UpdatePartyTimer;
             Svc.Framework.Update -= UpdateDeadtionary;
+            Svc.Framework.Update -= CheckInterruptedCasts;
         }
 
         internal static void OnCombat(ConditionFlag flag, bool value)
@@ -74,5 +111,10 @@ namespace WrathCombo.CustomComboNS.Functions
             if (flag == ConditionFlag.InCombat && value)
                 combatStart = DateTime.Now;
         }
+
+        public unsafe static float CountdownRemaining => MathF.Max(0, AgentCountDownSettingDialog.Instance()->TimeRemaining);
+
+        public unsafe static bool CountdownActive => AgentCountDownSettingDialog.Instance()->Active;
+       
     }
 }

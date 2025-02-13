@@ -53,27 +53,27 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.MCHPvP_BurstMode;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID == BlastCharge)
                 {
-                    var canWeave = CanWeave(actionID);
+                    var canWeave = CanWeave();
                     var analysisStacks = GetRemainingCharges(Analysis);
                     var bigDamageStacks = GetRemainingCharges(OriginalHook(Drill));
                     var overheated = HasEffect(Buffs.Overheated);
                     var FMFOption = PluginConfiguration.GetCustomIntValue(Config.MCHPVP_FMFOption);
 
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage() && HasBattleTarget())
                     {
                         // MarksmanSpite execute condition - todo add config
-                        if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_MarksmanSpite) && EnemyHealthCurrentHp() < GetOptionValue(Config.MCHPVP_MarksmanSpite) && IsLB1Ready)
+                        if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_MarksmanSpite) && HasBattleTarget() && EnemyHealthCurrentHp() < GetOptionValue(Config.MCHPVP_MarksmanSpite) && IsLB1Ready)
                             return MarksmanSpite;
 
                         if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_Wildfire) && canWeave && overheated && IsOffCooldown(Wildfire))
                             return OriginalHook(Wildfire);
 
                         // FullMetalField condition when not overheated or if overheated and FullMetalField is off cooldown
-                        if(IsEnabled(CustomComboPreset.MCHPvP_BurstMode_FullMetalField) && IsOffCooldown(FullMetalField))
+                        if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_FullMetalField) && IsOffCooldown(FullMetalField))
                         {
                             if (FMFOption == 1)
                             {
@@ -86,10 +86,6 @@ namespace WrathCombo.Combos.PvP
                                     return FullMetalField;
                             }
                         }
-
-                        // If overheated, BlazingShot is the next action
-                        if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_BlazingShot) && overheated)
-                            return OriginalHook(BlazingShot);
 
                         // Check if primed buffs and analysis conditions are met
                         bool hasPrimedBuffs = HasEffect(Buffs.DrillPrimed) ||
@@ -112,7 +108,7 @@ namespace WrathCombo.Combos.PvP
                             if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_Drill) && HasEffect(Buffs.DrillPrimed))
                                 return OriginalHook(Drill);
 
-                            if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_BioBlaster) && HasEffect(Buffs.BioblasterPrimed) && GetTargetDistance() <= 12)
+                            if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_BioBlaster) && HasEffect(Buffs.BioblasterPrimed) && HasBattleTarget() && GetTargetDistance() <= 12)
                                 return OriginalHook(BioBlaster);
 
                             if (IsEnabled(CustomComboPreset.MCHPvP_BurstMode_AirAnchor) && HasEffect(Buffs.AirAnchorPrimed))

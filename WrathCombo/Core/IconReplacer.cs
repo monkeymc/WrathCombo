@@ -1,13 +1,16 @@
 using Dalamud.Hooking;
 using ECommons.DalamudServices;
+using ECommons.GameHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using WrathCombo.Combos.PvE;
 using WrathCombo.CustomComboNS;
 using WrathCombo.CustomComboNS.Functions;
+using WrathCombo.Extensions;
 using WrathCombo.Services;
 
 namespace WrathCombo.Core
@@ -46,7 +49,9 @@ namespace WrathCombo.Core
         /// <inheritdoc/>
         public void Dispose()
         {
+            getIconHook?.Disable();
             getIconHook?.Dispose();
+            isIconReplaceableHook?.Disable();
             isIconReplaceableHook?.Dispose();
         }
 
@@ -55,12 +60,24 @@ namespace WrathCombo.Core
         /// <returns> The result from the hook. </returns>
         internal uint OriginalHook(uint actionID) => getIconHook.Original(actionManager, actionID);
 
+        public static IEnumerable<CustomCombo>? FilteredCombos;
+
+        public void UpdateFilteredCombos()
+        {
+            FilteredCombos = CustomCombos.Where(x => x.Preset.Attributes() is not null && x.Preset.Attributes().IsPvP == CustomComboFunctions.InPvP() && ((x.Preset.Attributes().RoleAttribute is not null && x.Preset.Attributes().RoleAttribute.PlayerIsRole()) || x.Preset.Attributes().CustomComboInfo.JobID == Player.JobId || x.Preset.Attributes().CustomComboInfo.JobID == CustomComboFunctions.JobIDs.ClassToJob(Player.JobId)));
+            Svc.Log.Debug($"Now running {FilteredCombos.Count()} combos\n{string.Join("\n", FilteredCombos.Select(x => x.Preset.Attributes().CustomComboInfo.Name))}");
+        }
+
         private unsafe uint GetIconDetour(IntPtr actionManager, uint actionID)
         {
-            this.actionManager = actionManager;
-
             try
             {
+                if (FilteredCombos is null)
+                    UpdateFilteredCombos();
+
+                if (Service.Configuration.PerformanceMode)
+                    return OriginalHook(actionID);
+
                 if (Svc.ClientState.LocalPlayer == null)
                     return OriginalHook(actionID);
 
@@ -69,17 +86,13 @@ namespace WrathCombo.Core
                     (DisabledJobsPVP.Any(x => x == Svc.ClientState.LocalPlayer.ClassJob.RowId) && Svc.ClientState.IsPvP))
                     return OriginalHook(actionID);
 
-                uint lastComboMove = ActionManager.Instance()->Combo.Action;
-                float comboTime = ActionManager.Instance()->Combo.Action != 0 ? ActionManager.Instance()->Combo.Timer : 0;
-                byte level = Svc.ClientState.LocalPlayer?.Level ?? 0;
-
-                foreach (CustomCombo? combo in CustomCombos)
+                foreach (CustomCombo? combo in FilteredCombos)
                 {
-                    if (combo.TryInvoke(actionID, level, lastComboMove, comboTime, out uint newActionID))
+                    if (combo.TryInvoke(actionID, out uint newActionID))
                     {
-                        if (Service.Configuration.BlockSpellOnMove && ActionManager.GetAdjustedCastTime(ActionType.Action, newActionID) > 0 && CustomComboFunctions.IsMoving)
+                        if (Service.Configuration.BlockSpellOnMove && ActionManager.GetAdjustedCastTime(ActionType.Action, newActionID) > 0 && CustomComboFunctions.TimeMoving.Ticks > 0)
                         {
-                            return OriginalHook(11);
+                            return All.SavageBlade;
                         }
                         return newActionID;
                     }

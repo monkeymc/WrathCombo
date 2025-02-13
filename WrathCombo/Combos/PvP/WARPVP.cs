@@ -40,13 +40,13 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.WARPvP_BurstMode;
 
-            protected override uint Invoke(uint actionID, uint lastComboActionID, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is HeavySwing or Maim or StormsPath)
                 {
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
-                        var canWeave = CanWeave(actionID);
+                        var canWeave = CanWeave();
 
                         // Bloodwhetting condition (both WARPvP BurstMode and CanWeave)
                         if (IsEnabled(CustomComboPreset.WARPvP_BurstMode_Bloodwhetting))

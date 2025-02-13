@@ -3,6 +3,7 @@ using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using ECommons.DalamudServices;
+using ECommons.GameHelpers;
 using ECommons.ImGuiMethods;
 using ImGuiNET;
 using System.Collections.Generic;
@@ -13,8 +14,12 @@ using WrathCombo.Attributes;
 using WrathCombo.Combos;
 using WrathCombo.Combos.PvE;
 using WrathCombo.Core;
+using WrathCombo.CustomComboNS.Functions;
 using WrathCombo.Data;
+using WrathCombo.Extensions;
 using WrathCombo.Services;
+using System;
+using WrathCombo.Combos.PvP;
 
 namespace WrathCombo.Window.Functions
 {
@@ -27,6 +32,7 @@ namespace WrathCombo.Window.Functions
             public CustomComboPreset[] Conflicts;
             public CustomComboPreset? Parent;
             public BlueInactiveAttribute? BlueInactive;
+            public VariantAttribute? Variant;
             public VariantParentAttribute? VariantParent;
             public BozjaParentAttribute? BozjaParent;
             public EurekaParentAttribute? EurekaParent;
@@ -34,6 +40,7 @@ namespace WrathCombo.Window.Functions
             public ReplaceSkillAttribute? ReplaceSkill;
             public CustomComboInfoAttribute? CustomComboInfo;
             public AutoActionAttribute? AutoAction;
+            public RoleAttribute? RoleAttribute;
 
             public PresetAttributes(CustomComboPreset preset)
             {
@@ -41,6 +48,7 @@ namespace WrathCombo.Window.Functions
                 Conflicts = PresetStorage.GetConflicts(preset);
                 Parent = PresetStorage.GetParent(preset);
                 BlueInactive = preset.GetAttribute<BlueInactiveAttribute>();
+                Variant = preset.GetAttribute<VariantAttribute>();
                 VariantParent = preset.GetAttribute<VariantParentAttribute>();
                 BozjaParent = preset.GetAttribute<BozjaParentAttribute>();
                 EurekaParent = preset.GetAttribute<EurekaParentAttribute>();
@@ -48,18 +56,22 @@ namespace WrathCombo.Window.Functions
                 ReplaceSkill = preset.GetAttribute<ReplaceSkillAttribute>();
                 CustomComboInfo = preset.GetAttribute<CustomComboInfoAttribute>();
                 AutoAction = preset.GetAttribute<AutoActionAttribute>();
+                RoleAttribute = preset.GetAttribute<RoleAttribute>();
             }
         }
 
-        internal unsafe static void DrawPreset(CustomComboPreset preset, CustomComboInfoAttribute info, ref int i)
+        internal static Dictionary<CustomComboPreset, bool> GetJobAutorots => P
+            .IPCSearch.AutoActions.Where(x => x.Key.Attributes().IsPvP == CustomComboFunctions.InPvP() && (Player.JobId == x.Key.Attributes().CustomComboInfo.JobID || CustomComboFunctions.JobIDs.ClassToJob((byte)Player.Job) == x.Key.Attributes().CustomComboInfo.JobID) && x.Value && CustomComboFunctions.IsEnabled(x.Key) && x.Key.Attributes().Parent == null).ToDictionary();
+
+        internal unsafe static void DrawPreset(CustomComboPreset preset, CustomComboInfoAttribute info)
         {
             if (!Attributes.ContainsKey(preset))
             {
                 PresetAttributes attributes = new(preset);
                 Attributes[preset] = attributes;
             }
-            var enabled = PresetStorage.IsEnabled(preset);
-            var secret = Attributes[preset].IsPvP;
+            bool enabled = PresetStorage.IsEnabled(preset);
+            bool pvp = Attributes[preset].IsPvP;
             var conflicts = Attributes[preset].Conflicts;
             var parent = Attributes[preset].Parent;
             var blueAttr = Attributes[preset].BlueInactive;
@@ -79,32 +91,34 @@ namespace WrathCombo.Window.Functions
                 var labelSize = ImGui.CalcTextSize(label);
                 ImGui.SetCursorPosX(ImGui.GetContentRegionAvail().X - labelSize.X.Scale() - 64f.Scale());
                 bool autoOn = Service.Configuration.AutoActions[preset];
-                if (ImGui.Checkbox($"###AutoAction{i}", ref autoOn))
+                if (P.UIHelper.ShowIPCControlledCheckboxIfNeeded
+                        ($"###AutoAction{preset}", ref autoOn, preset, false))
                 {
                     Service.Configuration.AutoActions[preset] = autoOn;
                     Service.Configuration.Save();
+                    P.IPCSearch.UpdateActiveJobPresets();
                 }
                 ImGui.SameLine();
-                ImGuiEx.Text(label);
+                ImGui.Text(label);
                 ImGuiComponents.HelpMarker($"Add this feature to Auto-Rotation.\n" +
                     $"Auto-Rotation will automatically use the actions selected within the feature, allowing you to focus on movement. Configure the settings in the 'Auto-Rotation' section.");
                 ImGui.Separator();
             }
 
-            if (ImGui.Checkbox($"{info.Name}###{preset}{i}", ref enabled))
+            if (info.Name.Contains(" - AoE") || info.Name.Contains(" - Sin"))
+                if (P.UIHelper.PresetControlled(preset) is not null)
+                    P.UIHelper.ShowIPCControlledIndicatorIfNeeded(preset);
+
+            if (P.UIHelper.ShowIPCControlledCheckboxIfNeeded
+                    ($"{info.Name}###{preset}", ref enabled, preset, true))
             {
                 if (enabled)
                 {
-                    EnableParentPresets(preset);
-                    Service.Configuration.EnabledActions.Add(preset);
-                    foreach (var conflict in conflicts)
-                    {
-                        Service.Configuration.EnabledActions.Remove(conflict);
-                    }
+                    PresetStorage.EnablePreset(preset);
                 }
                 else
                 {
-                    Service.Configuration.EnabledActions.Remove(preset);
+                    PresetStorage.DisablePreset(preset);
                 }
 
                 Service.Configuration.Save();
@@ -115,10 +129,10 @@ namespace WrathCombo.Window.Functions
             Vector2 length = new();
             using (var styleCol = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey))
             {
-                if (i != -1)
+                if (currentPreset != -1)
                 {
-                    ImGui.Text($"#{i}: ");
-                    length = ImGui.CalcTextSize($"#{i}: ");
+                    ImGui.Text($"#{currentPreset}: ");
+                    length = ImGui.CalcTextSize($"#{currentPreset}: ");
                     ImGui.SameLine();
                     ImGui.PushItemWidth(length.Length());
                 }
@@ -164,7 +178,7 @@ namespace WrathCombo.Window.Functions
                     if (!string.IsNullOrEmpty(comboInfo.JobShorthand))
                         conflictBuilder.Insert(0, $"[{comboInfo.JobShorthand}] ");
 
-                    ImGuiEx.Text(GradientColor.Get(ImGuiColors.DalamudRed, CustomComboNS.Functions.CustomComboFunctions.IsEnabled(conflict) ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed, 1500), $"- {conflictBuilder}");
+                    ImGuiEx.Text(GradientColor.Get(ImGuiColors.DalamudRed, CustomComboFunctions.IsEnabled(conflict) ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed, 1500), $"- {conflictBuilder}");
                     conflictBuilder.Clear();
                 }
                 ImGui.Unindent();
@@ -173,6 +187,7 @@ namespace WrathCombo.Window.Functions
 
             if (blueAttr != null)
             {
+                blueAttr.GetActions();
                 if (blueAttr.Actions.Count > 0)
                 {
                     ImGui.PushStyleColor(ImGuiCol.Text, blueAttr.NoneSet ? ImGuiColors.DPSRed : ImGuiColors.DalamudOrange);
@@ -267,37 +282,72 @@ namespace WrathCombo.Window.Functions
             }
             if (enabled)
             {
-                switch (info.JobID)
+                if (!pvp)
                 {
-                  //  case All.JobID: All.Config.Draw(preset); break;
-                    case AST.JobID: AST.Config.Draw(preset); break;
-                    case BLM.JobID: BLM.Config.Draw(preset); break;
-                    case BLU.JobID: BLU.Config.Draw(preset); break;
-                    case BRD.JobID: BRD.Config.Draw(preset); break;
-                    case DNC.JobID: DNC.Config.Draw(preset); break;
-                    case DOL.JobID: DOL.Config.Draw(preset); break;
-                    case DRG.JobID: DRG.Config.Draw(preset); break;
-                    case DRK.JobID: DRK.Config.Draw(preset); break;
-                    case GNB.JobID: GNB.Config.Draw(preset); break;
-                    case MCH.JobID: MCH.Config.Draw(preset); break;
-                    case MNK.JobID: MNK.Config.Draw(preset); break;
-                    case NIN.JobID: NIN.Config.Draw(preset); break;
-                    case PCT.JobID: PCT.Config.Draw(preset); break;
-                    case PLD.JobID: PLD.Config.Draw(preset); break;
-                    case RPR.JobID: RPR.Config.Draw(preset); break;
-                    case RDM.JobID: RDM.Config.Draw(preset); break;
-                    case SAM.JobID: SAM.Config.Draw(preset); break;
-                    case SCH.JobID: SCH.Config.Draw(preset); break;
-                    case SGE.JobID: SGE.Config.Draw(preset); break;
-                    case SMN.JobID: SMN.Config.Draw(preset); break;
-                    case VPR.JobID: VPR.Config.Draw(preset); break;
-                    case WAR.JobID: WAR.Config.Draw(preset); break;
-                    case WHM.JobID: WHM.Config.Draw(preset); break;
-                    default: UserConfigItems.Draw(preset, enabled); break;
+                    switch (info.JobID)
+                    {
+                        //  case All.JobID: All.Config.Draw(preset); break;
+                        case AST.JobID: AST.Config.Draw(preset); break;
+                        case BLM.JobID: BLM.Config.Draw(preset); break;
+                        case BLU.JobID: BLU.Config.Draw(preset); break;
+                        case BRD.JobID: BRD.Config.Draw(preset); break;
+                        case DNC.JobID: DNC.Config.Draw(preset); break;
+                        case DOL.JobID: DOL.Config.Draw(preset); break;
+                        case DRG.JobID: DRG.Config.Draw(preset); break;
+                        case DRK.JobID: DRK.Config.Draw(preset); break;
+                        case GNB.JobID: GNB.Config.Draw(preset); break;
+                        case MCH.JobID: MCH.Config.Draw(preset); break;
+                        case MNK.JobID: MNK.Config.Draw(preset); break;
+                        case NIN.JobID: NIN.Config.Draw(preset); break;
+                        case PCT.JobID: PCT.Config.Draw(preset); break;
+                        case PLD.JobID: PLD.Config.Draw(preset); break;
+                        case RPR.JobID: RPR.Config.Draw(preset); break;
+                        case RDM.JobID: RDM.Config.Draw(preset); break;
+                        case SAM.JobID: SAM.Config.Draw(preset); break;
+                        case SCH.JobID: SCH.Config.Draw(preset); break;
+                        case SGE.JobID: SGE.Config.Draw(preset); break;
+                        case SMN.JobID: SMN.Config.Draw(preset); break;
+                        case VPR.JobID: VPR.Config.Draw(preset); break;
+                        case WAR.JobID: WAR.Config.Draw(preset); break;
+                        case WHM.JobID: WHM.Config.Draw(preset); break;
+                        default: UserConfigItems.Draw(preset, enabled); break;
+                    }
                 }
+                else
+                {
+                    switch (info.JobID)
+                    {
+                        //  case All.JobID: All.Config.Draw(preset); break;
+                        case AST.JobID: AST.Config.Draw(preset); break;
+                        case BLM.JobID: BLM.Config.Draw(preset); break;
+                        case BLU.JobID: BLU.Config.Draw(preset); break;
+                        case BRD.JobID: BRD.Config.Draw(preset); break;
+                        case DNC.JobID: DNC.Config.Draw(preset); break;
+                        //case DOL.JobID: DOL.Config.Draw(preset); break;
+                        case DRG.JobID: DRG.Config.Draw(preset); break;
+                        case DRK.JobID: DRK.Config.Draw(preset); break;
+                        case GNB.JobID: GNB.Config.Draw(preset); break;
+                        case MCH.JobID: MCH.Config.Draw(preset); break;
+                        case MNK.JobID: MNK.Config.Draw(preset); break;
+                        case NIN.JobID: NIN.Config.Draw(preset); break;
+                        case PCT.JobID: PCT.Config.Draw(preset); break;
+                        case PLD.JobID: PLD.Config.Draw(preset); break;
+                        case RPR.JobID: RPR.Config.Draw(preset); break;
+                        case RDM.JobID: RDMPvP.Config.Draw(preset); break;
+                        case SAM.JobID: SAM.Config.Draw(preset); break;
+                        case SCH.JobID: SCH.Config.Draw(preset); break;
+                        case SGE.JobID: SGE.Config.Draw(preset); break;
+                        case SMN.JobID: SMN.Config.Draw(preset); break;
+                        case VPR.JobID: VPR.Config.Draw(preset); break;
+                        case WAR.JobID: WAR.Config.Draw(preset); break;
+                        case WHM.JobID: WHM.Config.Draw(preset); break;
+                        default: UserConfigItems.Draw(preset, enabled); break;
+                    }
+                }
+
             }
 
-            i++;
+            currentPreset++;
 
             presetChildren.TryGetValue(preset, out var children);
 
@@ -309,6 +359,10 @@ namespace WrathCombo.Window.Functions
 
                     foreach (var (childPreset, childInfo) in children)
                     {
+                        presetChildren.TryGetValue(childPreset, out var grandchildren);
+                        InfoBox box = new() { HasMaxWidth = true, Color = Colors.Grey, BorderThickness = 1f, CurveRadius = 4f, ContentsAction = () => { DrawPreset(childPreset, childInfo); } };
+                        Action draw = grandchildren?.Count() > 0 ? () => box.Draw() : () => DrawPreset(childPreset, childInfo);
+
                         if (Service.Configuration.HideConflictedCombos)
                         {
                             var conflictOriginals = PresetStorage.GetConflicts(childPreset);    // Presets that are contained within a ConflictedAttribute
@@ -316,7 +370,9 @@ namespace WrathCombo.Window.Functions
 
                             if (!conflictsSource.Where(x => x == childPreset || x == preset).Any() || conflictOriginals.Length == 0)
                             {
-                                DrawPreset(childPreset, childInfo, ref i);
+                                draw();
+                                if (grandchildren?.Count() > 0)
+                                    ImGui.Spacing();
                                 continue;
                             }
 
@@ -326,18 +382,22 @@ namespace WrathCombo.Window.Functions
                                 Service.Configuration.Save();
 
                                 // Keep removed items in the counter
-                                i += 1 + AllChildren(presetChildren[childPreset]);
+                                currentPreset += 1 + AllChildren(presetChildren[childPreset]);
                             }
 
                             else
                             {
-                                DrawPreset(childPreset, childInfo, ref i);
+                                draw();
+                                if (grandchildren?.Count() > 0)
+                                    ImGui.Spacing();
                                 continue;
                             }
                         }
                         else
                         {
-                            DrawPreset(childPreset, childInfo, ref i);
+                            draw();
+                            if (grandchildren?.Count() > 0)
+                                ImGui.Spacing();
                             continue;
                         }
                     }
@@ -346,7 +406,7 @@ namespace WrathCombo.Window.Functions
                 }
                 else
                 {
-                    i += AllChildren(presetChildren[preset]);
+                    currentPreset += AllChildren(presetChildren[preset]);
 
                 }
             }
@@ -385,31 +445,6 @@ namespace WrathCombo.Window.Functions
             }
 
             return output;
-        }
-
-
-
-        /// <summary> Iterates up a preset's parent tree, enabling each of them. </summary>
-        /// <param name="preset"> Combo preset to enabled. </param>
-        private static void EnableParentPresets(CustomComboPreset preset)
-        {
-            var parentMaybe = PresetStorage.GetParent(preset);
-
-            while (parentMaybe != null)
-            {
-                var parent = parentMaybe.Value;
-
-                if (!Service.Configuration.EnabledActions.Contains(parent))
-                {
-                    Service.Configuration.EnabledActions.Add(parent);
-                    foreach (var conflict in PresetStorage.GetConflicts(parent))
-                    {
-                        Service.Configuration.EnabledActions.Remove(conflict);
-                    }
-                }
-
-                parentMaybe = PresetStorage.GetParent(parent);
-            }
         }
     }
 }

@@ -1,10 +1,11 @@
 ﻿#region
 
+using ECommons.GameHelpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ECommons.GameHelpers;
 using WrathCombo.CustomComboNS.Functions;
+using WrathCombo.Window.Functions;
 
 #endregion
 
@@ -17,25 +18,28 @@ public class ContentCheck
     /// </summary>
     public enum ListSet
     {
-        /// <seealso cref="ContentCheck.IsInBottomHalfContent" />
-        /// <seealso cref="ContentCheck.IsInTopHalfContent" />
-        /// <seealso cref="ContentCheck.BottomHalfContent" />
-        /// <seealso cref="ContentCheck.TopHalfContent" />
+        /// <seealso cref="IsInBottomHalfContent" />
+        /// <seealso cref="IsInTopHalfContent" />
+        /// <seealso cref="BottomHalfContent" />
+        /// <seealso cref="TopHalfContent" />
         Halved,
 
-        /// <seealso cref="ContentCheck.IsInCasualContent" />
-        /// <seealso cref="ContentCheck.IsInHardContent" />
-        /// <seealso cref="ContentCheck.CasualContent" />
-        /// <seealso cref="ContentCheck.HardContent" />
+        /// <seealso cref="IsInCasualContent" />
+        /// <seealso cref="IsInHardContent" />
+        /// <seealso cref="CasualContent" />
+        /// <seealso cref="HardContent" />
         CasualVSHard,
 
-        /// <seealso cref="ContentCheck.IsInSoftCoreContent" />
-        /// <seealso cref="ContentCheck.IsInMidCoreContent" />
-        /// <seealso cref="ContentCheck.IsInHardCoreContent" />
-        /// <seealso cref="ContentCheck.SoftCoreContent" />
-        /// <seealso cref="ContentCheck.MidCoreContent" />
-        /// <seealso cref="ContentCheck.HardCoreContent" />
+        /// <seealso cref="IsInSoftCoreContent" />
+        /// <seealso cref="IsInMidCoreContent" />
+        /// <seealso cref="IsInHardCoreContent" />
+        /// <seealso cref="SoftCoreContent" />
+        /// <seealso cref="MidCoreContent" />
+        /// <seealso cref="HardCoreContent" />
         Cored,
+
+        /// <seealso cref="IsInBossOnlyContent" />
+        BossOnly,
     }
 
     /// <summary>
@@ -82,6 +86,13 @@ public class ContentCheck
                         return true;
                     break;
 
+                case ListSet.BossOnly:
+                    if (configuredContent[0])
+                        return true;
+                    if (configuredContent[1] && IsInBossOnlyContent())
+                        return true;
+                    break;
+
                 default:
                     throw new ArgumentOutOfRangeException
                         (nameof(configListSet), configListSet, null);
@@ -91,7 +102,28 @@ public class ContentCheck
         }
     }
 
+    internal static bool IsInConfiguredContent
+        (UserInt configuredContent, ListSet configListSet)
+    {
+        switch (configListSet)
+        {
+            case ListSet.BossOnly:
+                if (configuredContent == 0)
+                    return true;
+                if (configuredContent == 1 && IsInBossOnlyContent())
+                    return true;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException
+                    (nameof(configListSet), configListSet, null);
+        }
+
+        return false;
+    }
+
     #region Halved Content Lists
+
+#pragma warning disable CS1574
 
     /// <summary>
     ///     Whether the current content is in the bottom half of the list of content
@@ -99,7 +131,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="BottomHalfContent" />.
@@ -120,7 +152,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="TopHalfContent" />.
@@ -190,7 +222,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="CasualContent" />.
@@ -210,7 +242,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="HardContent" />.
@@ -278,7 +310,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="SoftCoreContent" />.
@@ -298,7 +330,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="MidCoreContent" />.
@@ -318,7 +350,7 @@ public class ContentCheck
     /// </summary>
     /// <returns>
     ///     If the
-    ///     <see cref="ECommons.GameHelpers.Content.DetermineContentDifficulty">
+    ///     <see cref="Content.DetermineContentDifficulty">
     ///         determined difficulty
     ///     </see>
     ///     is in the list of <see cref="HardCoreContent" />.
@@ -332,6 +364,8 @@ public class ContentCheck
         HardCoreContent.Contains(
             Content.ContentDifficulty ?? ContentDifficulty.Unknown
         );
+
+#pragma warning restore CS1574
 
     /// <summary>
     ///     A list of content difficulties that are considered soft-core.
@@ -396,6 +430,44 @@ public class ContentCheck
     /// <seealso cref="HardCoreContent" />
     public static readonly string HardCoreContentList =
         string.Join(", ", HardCoreContent.Select(x => x.ToString()));
+
+    #endregion
+
+    #region Boss Only Lists
+
+    /// <summary>
+    ///     Whether the current content only contains bosses
+    /// </summary>
+    /// <returns>
+    ///     If the
+    ///     <see cref="Content.ContentFinderConditionRow">
+    ///         CFC
+    ///     </see>
+    ///     is in a static list of boss only content; as in, trash-less bosses.
+    /// </returns>
+    /// <remarks>
+    ///     In this case, the rest of this list would just be <c>true</c>, as the
+    ///     alternative is <c>All Content</c>.
+    /// </remarks>
+    /// <seealso cref="UserConfig.DrawBossOnlyChoice(UserBoolArray, string)"/>
+    public static bool IsInBossOnlyContent()
+    {
+        if (Content.ContentType is ContentType.Trial)
+            return true;
+
+        if (Content.ContentType is ContentType.Raid)
+        {
+            if (Content.ContentFinderConditionRow.HasValue && Content.ContentFinderConditionRow.Value.RowId is 93 or 94 or 95 or 96 or 97 or 98 or 99 or 100 or 103 or 104 or 105 or 107 or 108 or 113 or 114 or 137 or 138 or 186 or 187 or 188)
+                return false;
+
+            return true;
+        }
+
+        if (Content.ContentFinderConditionRow?.RowId is 1010) //Chaotic Alliance, might end up being refactored in the future
+            return true;
+
+        return false;
+    }
 
     #endregion
 }

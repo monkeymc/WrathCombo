@@ -1,7 +1,7 @@
 using WrathCombo.Combos.PvP;
 using WrathCombo.CustomComboNS.Functions;
-using WrathCombo.Window.Functions;
 using WrathCombo.Extensions;
+using WrathCombo.Window.Functions;
 
 namespace WrathCombo.Combos.PvE;
 
@@ -20,18 +20,26 @@ internal partial class PCT
             PCT_ST_WeaponStop = new("PCT_ST_WeaponStop"),
             PCT_AoE_WeaponStop = new("PCT_AoE_WeaponStop"),
             PCT_ST_LandscapeStop = new("PCT_ST_LandscapeStop"),
-            PCT_AoE_LandscapeStop = new("PCT_AoE_LandscapeStop");
+            PCT_AoE_LandscapeStop = new("PCT_AoE_LandscapeStop"),
+            PCT_Opener_Choice = new("PCT_Opener_Choice"),
+            PCT_Balance_Content = new("PCT_Balance_Content", 1);
 
         public static UserBool
             CombinedMotifsMog = new("CombinedMotifsMog"),
             CombinedMotifsMadeen = new("CombinedMotifsMadeen"),
             CombinedMotifsWeapon = new("CombinedMotifsWeapon"),
-            CombinedMotifsLandscape = new ("CombinedMotifsLandscape");
+            CombinedMotifsLandscape = new("CombinedMotifsLandscape");
 
         internal static void Draw(CustomComboPreset preset)
         {
             switch (preset)
             {
+                case CustomComboPreset.PCT_ST_Advanced_Openers:
+                    UserConfig.DrawHorizontalRadioButton(PCT_Opener_Choice, $"2nd GCD {StarryMuse.ActionName()}", "", 0);
+                    UserConfig.DrawHorizontalRadioButton(PCT_Opener_Choice, $"3rd GCD {StarryMuse.ActionName()}", "", 1);
+
+                    UserConfig.DrawBossOnlyChoice(PCT_Balance_Content);
+                    break;
                 case CustomComboPreset.CombinedAetherhues:
                     UserConfig.DrawRadioButton(CombinedAetherhueChoices, "Both Single Target & AoE",
                         $"Replaces both {FireInRed.ActionName()} & {FireIIinRed.ActionName()}", 0);

@@ -48,7 +48,7 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.DNCPvP_BurstMode;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is Cascade or Fountain or ReverseCascade or Fountainfall)
                 {
@@ -57,7 +57,7 @@ namespace WrathCombo.Combos.PvP
                     bool curingWaltzReady = !GetCooldown(CuringWaltz).IsCooldown;
                     bool honingDanceReady = !GetCooldown(HoningDance).IsCooldown;
                     var acclaimStacks = GetBuffStacks(Buffs.Acclaim);
-                    bool canWeave = CanWeave(actionID);
+                    bool canWeave = CanWeave();
                     var distance = GetTargetDistance();
                     var HPThreshold = PluginConfiguration.GetCustomIntValue(Config.DNCPvP_WaltzThreshold);
                     var HP = PlayerHealthPercentageHp();

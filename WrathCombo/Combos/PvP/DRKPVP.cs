@@ -40,14 +40,14 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.DRKPvP_Burst;
 
-            protected override uint Invoke(uint actionID, uint lastComboActionID, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is HardSlash or SyphonStrike or Souleater)
                 {
-                    bool canWeave = CanWeave(HardSlash);
+                    bool canWeave = CanWeave();
                     int shadowBringerThreshold = GetOptionValue(Config.ShadowbringerThreshold);
 
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
                         if (IsEnabled(CustomComboPreset.DRKPvP_Plunge) && ActionReady(Plunge))
                         {
@@ -78,12 +78,12 @@ namespace WrathCombo.Combos.PvP
                             if (IsEnabled(CustomComboPreset.DRKPvP_Impalement) && ActionReady(Impalement))
                                 return OriginalHook(Impalement);
 
-                            if (comboTime > 1f)
+                            if (ComboTimer > 1f)
                             {
-                                if (lastComboActionID == HardSlash)
+                                if (ComboAction == HardSlash)
                                     return OriginalHook(SyphonStrike);
 
-                                if (lastComboActionID == SyphonStrike)
+                                if (ComboAction == SyphonStrike)
                                     return OriginalHook(Souleater);
                             }
 

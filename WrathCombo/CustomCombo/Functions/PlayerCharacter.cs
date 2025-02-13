@@ -1,9 +1,16 @@
-﻿using Dalamud.Game.ClientState.Conditions;
+﻿using System;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Memory;
 using ECommons.DalamudServices;
+using ECommons.GameFunctions;
 using FFXIVClientStructs.FFXIV.Client.Game.Fate;
+using FFXIVClientStructs.FFXIV.Client.Game.Group;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using Lumina.Excel.Sheets;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using System.Linq;
+using WrathCombo.Combos.PvE;
+using Action = Lumina.Excel.Sheets.Action;
 using GameMain = FFXIVClientStructs.FFXIV.Client.Game.GameMain;
 
 namespace WrathCombo.CustomComboNS.Functions
@@ -24,7 +31,7 @@ namespace WrathCombo.CustomComboNS.Functions
 
         /// <summary> Find if the player is bound by duty. </summary>
         /// <returns> A value indicating whether the player is bound by duty. </returns>
-        public static bool InDuty() => Svc.Condition[ConditionFlag.BoundByDuty] || Svc.Condition[ConditionFlag.BoundByDuty56] || Svc.Condition[ConditionFlag.BoundByDuty95];
+        public unsafe static bool InDuty() => GameMain.Instance()->CurrentContentFinderConditionId > 0;
 
         /// <summary> Find if the player has a pet present. </summary>
         /// <returns> A value indicating whether the player has a pet (fairy/carbuncle) present. </returns>
@@ -48,5 +55,51 @@ namespace WrathCombo.CustomComboNS.Functions
         }
 
         public unsafe static bool InFATE() => FateManager.Instance()->CurrentFate is not null && LocalPlayer.Level <= FateManager.Instance()->CurrentFate->MaxLevel;
+
+        public unsafe static bool PlayerHasTankStance()
+        {
+            return LocalPlayer.ClassJob.RowId switch
+            {
+                PLD.JobID or PLD.ClassID => HasEffect(PLD.Buffs.IronWill),
+                WAR.JobID or WAR.ClassID => HasEffect(WAR.Buffs.Defiance),
+                DRK.JobID => HasEffect(DRK.Buffs.Grit),
+                GNB.JobID => HasEffect(GNB.Buffs.RoyalGuard),
+                BLU.JobID => HasEffect(BLU.Buffs.TankMimicry),
+                _ => false
+            };
+        }
+
+        public unsafe static bool InBossEncounter()
+        {
+            if (NearbyBosses.Count() == 0)
+                return false;
+
+            foreach (var boss in NearbyBosses)
+            {
+                if (boss.Struct()->InCombat && boss.GetNameplateKind() == NameplateKind.HostileEngagedSelfDamaged)
+                    return true;
+            }
+
+            return false;
+        }
+
+        public unsafe static AllianceGroup GetAllianceGroup()
+        {
+            if (GroupManager.Instance()->MainGroup.IsAlliance)
+            {
+                var array = UIModule.Instance()->GetRaptureAtkModule()->AtkModule.AtkArrayDataHolder.StringArrays[3]->StringArray[4];
+                var str = MemoryHelper.ReadSeStringNullTerminated(new System.IntPtr(array));
+                var lastChar = str.TextValue.Last();
+
+                return lastChar switch
+                {
+                    'A' => AllianceGroup.GroupA,
+                    'B' => AllianceGroup.GroupB,
+                    'C' => AllianceGroup.GroupC,
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+            }
+            return AllianceGroup.NotInAlliance;
+        }
     }
 }

@@ -1,18 +1,27 @@
 ﻿using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Hooking;
+using Dalamud.Utility;
 using ECommons.DalamudServices;
 using ECommons.GameFunctions;
+using ECommons.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using Lumina.Excel.Sheets;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Numerics;
 using WrathCombo.Combos.PvE;
+using WrathCombo.Core;
+using WrathCombo.CustomComboNS;
 using WrathCombo.CustomComboNS.Functions;
 using WrathCombo.Extensions;
 using WrathCombo.Services;
+using static FFXIVClientStructs.FFXIV.Client.Game.Character.ActionEffectHandler;
+using static WrathCombo.CustomComboNS.Functions.CustomComboFunctions;
 
 namespace WrathCombo.Data
 {
@@ -28,7 +37,7 @@ namespace WrathCombo.Data
         internal static Dictionary<uint, Trait> TraitSheet = Svc.Data.GetExcelSheet<Trait>()!
             .Where(i => i.ClassJobCategory.IsValid) //All player traits are assigned to a category. Chocobo and other garbage lacks this, thus excluded.
             .ToDictionary(i => i.RowId, i => i);
-
+        private static uint lastAction = 0;
         private static readonly Dictionary<string, List<uint>> statusCache = [];
 
         internal static readonly Dictionary<uint, long> ChargeTimestamps = [];
@@ -37,45 +46,108 @@ namespace WrathCombo.Data
 
         internal readonly static List<uint> CombatActions = [];
 
-        private delegate void ReceiveActionEffectDelegate(ulong sourceObjectId, IntPtr sourceActor, IntPtr position, IntPtr effectHeader, IntPtr effectArray, IntPtr effectTrail);
+        public delegate void LastActionChangeDelegate();
+        public static event LastActionChangeDelegate? OnLastActionChange;
+
+        public delegate void ActionSendDelegate();
+        public static event ActionSendDelegate? OnActionSend;
+
+        private unsafe delegate void ReceiveActionEffectDelegate(uint casterEntityId, Character* casterPtr, Vector3* targetPos, Header* header, TargetEffects* effects, GameObjectId* targetEntityIds);
         private readonly static Hook<ReceiveActionEffectDelegate>? ReceiveActionEffectHook;
-        private static void ReceiveActionEffectDetour(ulong sourceObjectId, IntPtr sourceActor, IntPtr position, IntPtr effectHeader, IntPtr effectArray, IntPtr effectTrail)
+
+        private unsafe delegate bool UseActionDelegate(ActionManager* actionManager, ActionType actionType, uint actionId, ulong targetId, uint extraParam, ActionManager.UseActionMode mode, uint comboRouteId, bool* outOptAreaTargeted);
+        private readonly static Hook<UseActionDelegate>? UseActionHook;
+
+        private unsafe static void ReceiveActionEffectDetour(uint casterEntityId, Character* casterPtr, Vector3* targetPos, Header* header, TargetEffects* effects, GameObjectId* targetEntityIds)
         {
-            ReceiveActionEffectHook!.Original(sourceObjectId, sourceActor, position, effectHeader, effectArray, effectTrail);
-            ActionEffectHeader header = Marshal.PtrToStructure<ActionEffectHeader>(effectHeader);
-            
-            if (ActionType is 13 or 2) return;
-            if (header.ActionId != 7 &&
-                header.ActionId != 8 &&
-                sourceObjectId == Svc.ClientState.LocalPlayer.GameObjectId)
+            ReceiveActionEffectHook!.Original(casterEntityId, casterPtr, targetPos, header, effects, targetEntityIds);
+
+            try
             {
-                TimeLastActionUsed = DateTime.Now;
-                if (header.ActionId != CombatActions.LastOrDefault())
-                    LastActionUseCount = 1;
-                else
-                    LastActionUseCount++;
+                var rawEffects = (ulong*)effects;
+                List<(ulong id, ActionEffects effects)> targets = new();
+                for (int i = 0; i < header->NumTargets; ++i)
+                {
+                    var targetEffects = new ActionEffects();
+                    for (int j = 0; j < ActionEffects.MaxCount; ++j)
+                        targetEffects[j] = rawEffects[i * 8 + j];
 
-                CombatActions.Add(header.ActionId);
-                LastSuccessfulUseTime[header.ActionId] = Environment.TickCount64;
+                    targets.Add(new(targetEntityIds[i], targetEffects));
+                }
 
-                if (ActionSheet.TryGetValue(header.ActionId, out var sheet))
-                { 
-                    switch (sheet.ActionCategory.Value.RowId)
+                foreach (var target in targets)
+                {
+                    foreach (var eff in target.effects)
                     {
-                        case 2: //Spell
-                            LastSpell = header.ActionId;
-                            break;
-                        case 3: //Weaponskill
-                            LastWeaponskill = header.ActionId;
-                            break;
-                        case 4: //Ability
-                            LastAbility = header.ActionId;
-                            break;
+#if DEBUG
+                        Svc.Log.Verbose($"{eff.Type}, {eff.Value} 0:{eff.Param0}, 1:{eff.Param1}, 2:{eff.Param2}, 3:{eff.Param3}, 4:{eff.Param4} | ({header->ActionId.ActionName()}) -> {Svc.Objects.First(x => x.GameObjectId == target.id).Name}, {eff.AtSource}/{eff.FromTarget}");
+#endif
+                        if (eff.Type is ActionEffectType.Heal or ActionEffectType.Damage)
+                        {
+                            if (GetPartyMembers().Any(x => x.GameObjectId == target.id))
+                            {
+                                var member = GetPartyMembers().First(x => x.GameObjectId == target.id);
+                                member.CurrentHP = eff.Type == ActionEffectType.Damage ? Math.Min(member.BattleChara.MaxHp, member.CurrentHP - eff.Value) : Math.Min(member.BattleChara.MaxHp, member.CurrentHP + eff.Value);
+                                member.HPUpdatePending = true;
+                                Svc.Framework.RunOnTick(() => member.HPUpdatePending = false, TimeSpan.FromSeconds(1.5));
+                            }
+                        }
+                        if (eff.Type is ActionEffectType.MpGain or ActionEffectType.MpLoss)
+                        {
+                            if (GetPartyMembers().Any(x => x.GameObjectId == (eff.AtSource ? casterEntityId : target.id)))
+                            {
+                                var member = GetPartyMembers().First(x => x.GameObjectId == (eff.AtSource ? casterEntityId : target.id));
+                                member.CurrentMP = eff.Type == ActionEffectType.MpLoss ? Math.Min(member.BattleChara.MaxMp, member.CurrentMP - eff.Value) : Math.Min(member.BattleChara.MaxMp, member.CurrentMP + eff.Value);
+                                member.MPUpdatePending = true;
+                                Svc.Framework.RunOnTick(() => member.MPUpdatePending = false, TimeSpan.FromSeconds(1.5));
+                            }
+                        }
                     }
                 }
 
-                if (Service.Configuration.EnabledOutputLog)
-                    OutputLog();
+
+
+                if (ActionType is 13 or 2) return;
+                if (header->ActionId != 7 &&
+                    header->ActionId != 8 &&
+                    casterEntityId == Svc.ClientState.LocalPlayer.GameObjectId)
+                {
+                    LastAction = header->ActionId;
+                    TimeLastActionUsed = DateTime.Now;
+                    if (header->ActionId != CombatActions.LastOrDefault())
+                        LastActionUseCount = 1;
+                    else
+                        LastActionUseCount++;
+
+                    CombatActions.Add(header->ActionId);
+                    LastSuccessfulUseTime[header->ActionId] = Environment.TickCount64;
+
+                    if (ActionSheet.TryGetValue(header->ActionId, out var sheet))
+                    {
+                        switch (sheet.ActionCategory.Value.RowId)
+                        {
+                            case 2: //Spell
+                                LastSpell = header->ActionId;
+                                break;
+                            case 3: //Weaponskill
+                                LastWeaponskill = header->ActionId;
+                                break;
+                            case 4: //Ability
+                                LastAbility = header->ActionId;
+                                break;
+                        }
+
+                        if (sheet.TargetArea)
+                            WrathOpener.CurrentOpener?.ProgressOpener(header->ActionId);
+                    }
+
+                    if (Service.Configuration.EnabledOutputLog)
+                        OutputLog();
+                }
+            }
+            catch
+            {
+
             }
         }
 
@@ -85,20 +157,22 @@ namespace WrathCombo.Data
         {
             try
             {
-                if (!CustomComboFunctions.InCombat())
+                OnActionSend?.Invoke();
+
+                if (!InCombat())
                     CombatActions.Clear();
 
-                if (actionType == 1 && CustomComboFunctions.GetMaxCharges(actionId) > 0)
+                if (actionType == 1 && GetMaxCharges(actionId) > 0)
                     ChargeTimestamps[actionId] = Environment.TickCount64;
 
                 if (actionType == 1)
                     ActionTimestamps[actionId] = Environment.TickCount64;
 
                 CheckForChangedTarget(actionId, ref targetObjectId);
-                TimeLastActionUsed = DateTime.Now;
+                TimeLastActionUsed = DateTime.Now + TimeSpan.FromMilliseconds(ActionManager.GetAdjustedCastTime((ActionType)actionType, actionId));
                 LastAction = actionId;
                 ActionType = actionType;
-
+                WrathOpener.CurrentOpener?.ProgressOpener(actionId);
                 UpdateHelpers(actionId);
                 SendActionHook!.Original(targetObjectId, actionType, actionId, sequence, a5, a6, a7, a8, a9);
 
@@ -111,12 +185,15 @@ namespace WrathCombo.Data
             }
         }
 
+        public unsafe delegate bool CanQueueActionDelegate(ActionManager* actionManager, uint actionType, uint actionID);
+        public static readonly Hook<CanQueueActionDelegate> canQueueAction;
+
         private static void UpdateHelpers(uint actionId)
         {
             if (actionId is NIN.Ten or NIN.Chi or NIN.Jin or NIN.TenCombo or NIN.ChiCombo or NIN.JinCombo)
-                NIN.NINHelper.InMudra = true;
+                NIN.InMudra = true;
             else
-                NIN.NINHelper.InMudra = false;
+                NIN.InMudra = false;
         }
 
         private unsafe static void CheckForChangedTarget(uint actionId, ref ulong targetObjectId)
@@ -134,14 +211,14 @@ namespace WrathCombo.Data
                         targetObjectId = AST.QuickTargetCards.SelectedRandomMember.GameObjectId;
                         break;
                     case 1:
-                        if (CustomComboFunctions.HasFriendlyTarget())
+                        if (HasFriendlyTarget())
                             targetObjectId = Svc.Targets.Target.GameObjectId;
                         else
                             targetObjectId = AST.QuickTargetCards.SelectedRandomMember.GameObjectId;
                         break;
                     case 2:
-                        if (CustomComboFunctions.GetHealTarget(true, true) is not null)
-                            targetObjectId = CustomComboFunctions.GetHealTarget(true, true).GameObjectId;
+                        if (GetHealTarget(true, true) is not null)
+                            targetObjectId = GetHealTarget(true, true).GameObjectId;
                         else
                             targetObjectId = AST.QuickTargetCards.SelectedRandomMember.GameObjectId;
                         break;
@@ -228,7 +305,18 @@ namespace WrathCombo.Data
         }
 
         public static int NumberOfGcdsUsed => CombatActions.Count(x => GetAttackType(x) == ActionAttackType.Weaponskill || GetAttackType(x) == ActionAttackType.Spell);
-        public static uint LastAction { get; set; } = 0;
+        public static uint LastAction
+        {
+            get => lastAction;
+            set
+            {
+                if (lastAction != value)
+                {
+                    OnLastActionChange?.Invoke();
+                    lastAction = value;
+                }
+            }
+        }
         public static int LastActionUseCount { get; set; } = 0;
         public static uint ActionType { get; set; } = 0;
         public static uint LastWeaponskill { get; set; } = 0;
@@ -237,30 +325,57 @@ namespace WrathCombo.Data
 
         public static TimeSpan TimeSinceLastAction => DateTime.Now - TimeLastActionUsed;
 
-        private static DateTime TimeLastActionUsed { get; set; } = DateTime.Now;
+        public static DateTime TimeLastActionUsed { get; set; } = DateTime.Now;
 
         public static void OutputLog()
         {
-            Svc.Chat.Print($"You just used: {CombatActions.LastOrDefault().ActionName()} x{LastActionUseCount}");
+            DuoLog.Information($"You just used: {CombatActions.LastOrDefault().ActionName()} x{LastActionUseCount}");
         }
 
         public static void Dispose()
         {
+            Disable();
             ReceiveActionEffectHook?.Dispose();
             SendActionHook?.Dispose();
+            canQueueAction?.Dispose();
+            UseActionHook?.Dispose();
         }
 
         static unsafe ActionWatching()
         {
-            ReceiveActionEffectHook ??= Svc.Hook.HookFromSignature<ReceiveActionEffectDelegate>("40 55 56 57 41 54 41 55 41 56 48 8D AC 24", ReceiveActionEffectDetour);
+            ReceiveActionEffectHook ??= Svc.Hook.HookFromAddress<ReceiveActionEffectDelegate>(Addresses.Receive.Value, ReceiveActionEffectDetour);
             SendActionHook ??= Svc.Hook.HookFromSignature<SendActionDelegate>("48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B E9 41 0F B7 D9", SendActionDetour);
+            UseActionHook ??= Svc.Hook.HookFromAddress<UseActionDelegate>(ActionManager.Addresses.UseAction.Value, UseActionDetour);
+            canQueueAction ??= Svc.Hook.HookFromSignature<CanQueueActionDelegate>("E8 ?? ?? ?? ?? 84 C0 74 37 8B 84 24 ?? ?? 00 00", CanQueueDetour);
         }
 
+        private unsafe static bool UseActionDetour(ActionManager* actionManager, ActionType actionType, uint actionId, ulong targetId, uint extraParam, ActionManager.UseActionMode mode, uint comboRouteId, bool* outOptAreaTargeted)
+        {
+            if (Service.Configuration.PerformanceMode)
+            {
+                var result = actionId;
+                foreach (var combo in IconReplacer.FilteredCombos)
+                {
+                    if (combo.TryInvoke(actionId, out result))
+                    {
+                        actionId = result;
+                        break;
+                    }
+                }
+            }
+            return UseActionHook.Original(actionManager, actionType, actionId, targetId, extraParam, mode, comboRouteId, outOptAreaTargeted);
+        }
+
+        private static unsafe bool CanQueueDetour(ActionManager* actionManager, uint actionType, uint actionID)
+        {
+            return canQueueAction.Original(actionManager, actionType, actionID);
+        }
 
         public static void Enable()
         {
             ReceiveActionEffectHook?.Enable();
             SendActionHook?.Enable();
+            UseActionHook?.Enable();
             Svc.Condition.ConditionChange += ResetActions;
         }
 
@@ -281,6 +396,8 @@ namespace WrathCombo.Data
         {
             ReceiveActionEffectHook.Disable();
             SendActionHook?.Disable();
+            canQueueAction?.Disable();
+            UseActionHook?.Disable();
             Svc.Condition.ConditionChange -= ResetActions;
         }
 
@@ -289,7 +406,7 @@ namespace WrathCombo.Data
         public unsafe static int GetActionRange(uint id) => (int)ActionManager.GetActionRange(id);
         public static int GetActionEffectRange(uint id) => ActionSheet.TryGetValue(id, out var action) ? action.EffectRange : -1;
         public static int GetTraitLevel(uint id) => TraitSheet.TryGetValue(id, out var trait) ? trait.Level : 255;
-        public static string GetActionName(uint id) => ActionSheet.TryGetValue(id, out var action) ? action.Name.ToString() : "UNKNOWN ABILITY";
+        public static string GetActionName(uint id) => ActionSheet.TryGetValue(id, out var action) ? action.Name.ToDalamudString().ToString() : "UNKNOWN ABILITY";
 
         public static string GetBLUIndex(uint id)
         {
@@ -331,29 +448,5 @@ namespace WrathCombo.Data
             Weaponskill,
             Unknown
         }
-    }
-
-    internal unsafe static class ActionManagerHelper
-    {
-        private static readonly IntPtr actionMgrPtr;
-        internal static IntPtr FpUseAction => (IntPtr)ActionManager.Addresses.UseAction.Value;
-        internal static IntPtr FpUseActionLocation => (IntPtr)ActionManager.Addresses.UseActionLocation.Value;
-        internal static IntPtr CheckActionResources => (IntPtr)ActionManager.Addresses.CheckActionResources.Value;
-        public static ushort CurrentSeq => actionMgrPtr != IntPtr.Zero ? (ushort)Marshal.ReadInt16(actionMgrPtr + 0x110) : (ushort)0;
-        public static ushort LastRecievedSeq => actionMgrPtr != IntPtr.Zero ? (ushort)Marshal.ReadInt16(actionMgrPtr + 0x112) : (ushort)0;
-        public static bool IsCasting => actionMgrPtr != IntPtr.Zero && Marshal.ReadByte(actionMgrPtr + 0x28) != 0;
-        public static uint CastingActionId => actionMgrPtr != IntPtr.Zero ? (uint)Marshal.ReadInt32(actionMgrPtr + 0x24) : 0u;
-        public static uint CastTargetObjectId => actionMgrPtr != IntPtr.Zero ? (uint)Marshal.ReadInt32(actionMgrPtr + 0x38) : 0u;
-        static ActionManagerHelper() => actionMgrPtr = (IntPtr)ActionManager.Instance();
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    public struct ActionEffectHeader
-    {
-        [FieldOffset(0x0)] public long TargetObjectId;
-        [FieldOffset(0x8)] public uint ActionId;
-        [FieldOffset(0x14)] public uint UnkObjectId;
-        [FieldOffset(0x18)] public ushort Sequence;
-        [FieldOffset(0x1A)] public ushort Unk_1A;
     }
 }

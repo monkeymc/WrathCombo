@@ -1,5 +1,4 @@
 ﻿using WrathCombo.CustomComboNS;
-using WrathCombo.Data;
 
 namespace WrathCombo.Combos.PvP
 {
@@ -61,19 +60,19 @@ namespace WrathCombo.Combos.PvP
 
             float GCD = GetCooldown(KeenEdge).CooldownTotal; // 2.4 base in PvP
             
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is KeenEdge or BrutalShell or SolidBarrel or BurstStrike)
                 {
                     int corundumThreshold = GetOptionValue(Config.corundumThreshold);
                     int blastingZoneThreshold = GetOptionValue(Config.blastingZoneThreshold); 
 
-                    if (CanWeave(ActionWatching.LastWeaponskill) && IsEnabled(CustomComboPreset.GNBPvP_Corundum) && PlayerHealthPercentageHp() <= corundumThreshold && IsOffCooldown(HeartOfCorundum))
+                    if (CanWeave() && IsEnabled(CustomComboPreset.GNBPvP_Corundum) && PlayerHealthPercentageHp() <= corundumThreshold && IsOffCooldown(HeartOfCorundum))
                         return HeartOfCorundum;
 
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
-                        if (CanWeave(ActionWatching.LastWeaponskill)) //Weave section
+                        if (CanWeave()) //Weave section
                         {
                             //Continuation
                             if (IsEnabled(CustomComboPreset.GNBPvP_ST_Continuation) && OriginalHook(Continuation) != Continuation) // Weaving followup button, whenever it changes to something useable, it will fire
@@ -113,9 +112,9 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.GNBPvP_GnashingFang;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level) =>
+            protected override uint Invoke(uint actionID) =>
                 actionID is GnashingFang &&
-                    CanWeave(actionID) && (HasEffect(Buffs.ReadyToRip) || HasEffect(Buffs.ReadyToTear) || HasEffect(Buffs.ReadyToGouge))
+                    CanWeave() && (HasEffect(Buffs.ReadyToRip) || HasEffect(Buffs.ReadyToTear) || HasEffect(Buffs.ReadyToGouge))
                     ? OriginalHook(Continuation)
                     : actionID;
         }

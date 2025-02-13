@@ -5,11 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using ECommons.Logging;
 using WrathCombo.AutoRotation;
 using WrathCombo.Combos;
-using WrathCombo.Combos.PvE;
 using WrathCombo.Extensions;
 using WrathCombo.Window;
+using WrathCombo.Window.Tabs;
 
 namespace WrathCombo.Core
 {
@@ -49,12 +50,28 @@ namespace WrathCombo.Core
         public bool BlockSpellOnMove = false;
         public Vector4 TargetHighlightColor { get; set; } = new() { W = 1, X = 0.5f, Y = 0.5f, Z = 0.5f };
 
+        public bool OutputOpenerLogs;
+
+        public float MovementLeeway = 0f;
+
+        public float OpenerTimeout = 4f;
+
+        public bool PerformanceMode = false;
+
+        public double InterruptDelay  = 0.0f;
+
+        public bool OpenToCurrentJob = false;
+
+        public bool OpenToCurrentJobOnSwitch = false;
+
         #endregion
 
         #region AutoAction Settings
         public Dictionary<CustomComboPreset, bool> AutoActions { get; set; } = [];
 
         public AutoRotationConfig RotationConfig { get; set; } = new();
+
+        public Dictionary<uint, uint> IgnoredNPCs { get; set; } = new();
 
         #endregion
 
@@ -172,14 +189,8 @@ namespace WrathCombo.Core
         /// <summary> Gets active Blue Mage (BLU) spells. </summary>
         public List<uint> ActiveBLUSpells { get; set; } = [];
 
-        /// <summary> Gets or sets an array of 4 ability IDs to interact with the <see cref="CustomComboPreset.DNC_DanceComboReplacer"/> combo. </summary>
-        public uint[] DancerDanceCompatActionIDs { get; set; } = new uint[]
-        {
-            DNC.Cascade,
-            DNC.Flourish,
-            DNC.FanDance1,
-            DNC.FanDance2,
-        };
+        /// <summary> Gets or sets an array of 4 ability IDs to interact with the <see cref="CustomComboPreset.DNC_CustomDanceSteps"/> combo. </summary>
+        public uint[] DancerDanceCompatActionIDs { get; set; } = [ 0, 0, 0, 0, ];
 
         #endregion
 
@@ -222,18 +233,18 @@ namespace WrathCombo.Core
 
                         if (!needToResetMessagePrinted)
                         {
-                            Svc.Chat.PrintError($"[WrathCombo] Some features have been disabled due to an internal configuration update:");
+                            DuoLog.Error($"Some features have been disabled due to an internal configuration update:");
                             needToResetMessagePrinted = !needToResetMessagePrinted;
                         }
 
                         var info = preset.GetComboAttribute();
-                        Svc.Chat.PrintError($"[WrathCombo] - {info.JobName}: {info.Name}");
+                        DuoLog.Error($"- {info.JobName}: {info.Name}");
                         EnabledActions.Remove(preset);
                     }
                 }
 
                 if (needToResetMessagePrinted)
-                    Svc.Chat.PrintError($"[WrathCombo] Please re-enable these features to use them again. We apologise for the inconvenience");
+                    DuoLog.Error($"Please re-enable these features to use them again. We apologise for the inconvenience");
             }
             SetResetValues(config, true);
             Save();
@@ -241,7 +252,7 @@ namespace WrathCombo.Core
 
         #endregion
 
-        #region Other (SpecialEvent, MotD, Save)
+        #region Other (SpecialEvent, MotD)
 
         /// <summary> Hides the message of the day. </summary>
         public bool HideMessageOfTheDay { get; set; } = false;
@@ -253,8 +264,69 @@ namespace WrathCombo.Core
         /// <seealso cref="SettingChangeWindow"/>
         public string HideSettingsChangeSuggestionForVersion { get; set; } = "";
 
-        /// <summary> Save the configuration to disk. </summary>
-        public void Save() => Svc.PluginInterface.SavePluginConfig(this);
+        /// <summary>
+        ///     If the DTR Bar text should be shortened.
+        /// </summary>
+        public bool ShortDTRText { get; set; } = false;
+
+        #endregion
+
+        #region Saving
+
+        /// <summary>
+        ///     The queue of items to be saved.
+        /// </summary>
+        internal static readonly Queue<PluginConfiguration> SaveQueue = new();
+
+        /// <summary>
+        ///     Whether an item is currently being saved.
+        /// </summary>
+        private static bool _isSaving;
+
+        /// <summary>
+        ///     Process the <see cref="SaveQueue"/>, trying to save each item.
+        /// </summary>
+        /// <seealso cref="Save"/>
+        internal static void ProcessSaveQueue()
+        {
+            if (_isSaving || SaveQueue.Count == 0) return;
+
+            _isSaving = true;
+            var configToSave = SaveQueue.Dequeue();
+
+            var success = false;
+            var retryCount = 0;
+            while (!success)
+            {
+                try
+                {
+                    Svc.PluginInterface.SavePluginConfig(configToSave);
+                    success = true;
+                }
+                catch (Exception)
+                {
+                    retryCount++;
+                    if (retryCount >= 3)
+                        throw;
+                }
+            }
+
+            _isSaving = false;
+        }
+
+        /// <summary> Set the configuration to be saved to disk. </summary>
+        /// <remarks>
+        ///     Configurations set to be saved will be processed in the order they
+        ///     were added, each frame.
+        /// </remarks>
+        /// <seealso cref="SaveQueue"/>
+        public void Save()
+        {
+            if (Debug.DebugConfig)
+                return;
+
+            SaveQueue.Enqueue(this);
+        }
 
         #endregion
     }

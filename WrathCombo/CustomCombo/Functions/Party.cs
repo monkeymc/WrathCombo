@@ -1,8 +1,15 @@
-﻿using Dalamud.Game.ClientState.Objects.Types;
+﻿using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.DalamudServices;
+using ECommons.ExcelServices;
+using ECommons.GameFunctions;
+using ECommons.GameHelpers;
+using ECommons.Throttlers;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using System.Collections.Generic;
 using System.Linq;
-using WrathCombo.Services;
+using WrathCombo.AutoRotation;
+using WrathCombo.Combos.PvE;
 
 namespace WrathCombo.CustomComboNS.Functions
 {
@@ -14,17 +21,58 @@ namespace WrathCombo.CustomComboNS.Functions
 
         /// <summary> Gets the party list </summary>
         /// <returns> Current party list. </returns>
-        public static List<IBattleChara> GetPartyMembers()
+        public unsafe static List<WrathPartyMember> GetPartyMembers()
         {
-            var output = new List<IBattleChara>();
+            if (!Player.Available) return new();
+            if (!EzThrottler.Throttle("PartyUpdateThrottle", 2000))
+                return _partyList;
+
             for (int i = 1; i <= 8; i++)
             {
                 var member = GetPartySlot(i);
                 if (member != null)
-                    output.Add((IBattleChara)member);
+                {
+                    var chara = (member as IBattleChara);
+                    WrathPartyMember wmember = new()
+                    {
+                        GameObjectId = chara.GameObjectId,
+                        BattleChara = chara,
+                        CurrentHP = chara.CurrentHp
+                    };
+
+                    if (!_partyList.Any(x => x.BattleChara.GameObjectId == chara.GameObjectId))
+                        _partyList.Add(wmember);
+
+                }
             }
-            return output;
+
+            if (AutoRotationController.cfg is not null)
+            {
+                if (AutoRotationController.cfg.Enabled && AutoRotationController.cfg.HealerSettings.IncludeNPCs && Player.Job.IsHealer())
+                {
+                    foreach (var npc in Svc.Objects.Where(x => x is IBattleChara && x is not IPlayerCharacter).Cast<IBattleChara>())
+                    {
+                        if (ActionManager.CanUseActionOnTarget(All.Esuna, npc.GameObject()) && !_partyList.Any(x => x.BattleChara == npc))
+                        {
+                            WrathPartyMember wmember = new()
+                            {
+                                GameObjectId = npc.GameObjectId,
+                                BattleChara = npc,
+                                CurrentHP = npc.CurrentHp
+                            };
+
+                            if (!_partyList.Any(x => x.BattleChara.GameObjectId == npc.GameObjectId))
+                                _partyList.Add(wmember);
+                        }
+                    }
+                }
+            }
+
+            _partyList.RemoveAll(x => !Svc.Objects.Any(y => y.GameObjectId == x.GameObjectId));
+            return _partyList;
         }
+
+        private static List<WrathPartyMember> _partyList = new();
 
         public unsafe static IGameObject? GetPartySlot(int slot)
         {
@@ -80,6 +128,48 @@ namespace WrathCombo.CustomComboNS.Functions
                 PartyCount++;
             }
             return PartyCount == 0 ? 0 : (float)BuffCount / PartyCount * 100f; //Div by 0 check...just in case....
+        }
+
+        public static bool PartyInCombat() => PartyEngageDuration().Ticks > 0;
+    }
+
+    public enum AllianceGroup
+    {
+        GroupA,
+        GroupB,
+        GroupC,
+        NotInAlliance
+    }
+
+    public class WrathPartyMember
+    {
+        public bool HPUpdatePending = false;
+        public bool MPUpdatePending = false;
+        public ulong GameObjectId;
+        public IBattleChara BattleChara = null!;
+        public uint CurrentHP
+        {
+            get
+            {
+                if ((field > BattleChara.CurrentHp && !HPUpdatePending) || field < BattleChara.CurrentHp)
+                    field = BattleChara.CurrentHp;
+
+                return field;
+            }
+
+            set;
+        }
+
+        public uint CurrentMP
+        {
+            get
+            {
+                if ((field > BattleChara.CurrentMp && !MPUpdatePending) || field < BattleChara.CurrentMp)
+                    field = BattleChara.CurrentMp;
+
+                return field;
+            }
+            set;
         }
     }
 }

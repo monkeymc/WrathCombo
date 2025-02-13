@@ -1,3 +1,5 @@
+using WrathCombo.CustomComboNS.Functions;
+using WrathCombo.Window.Functions;
 using static WrathCombo.Window.Functions.UserConfig;
 
 namespace WrathCombo.Combos.PvE;
@@ -6,19 +8,29 @@ internal partial class BRD
 {
     internal static class Config
     {
-        public const string
-            BRD_RagingJawsRenewTime = "ragingJawsRenewTime",
-            BRD_NoWasteHPPercentage = "noWasteHpPercentage",
-            BRD_AoENoWasteHPPercentage = "AoENoWasteHpPercentage",
-            BRD_STSecondWindThreshold = "BRD_STSecondWindThreshold",
-            BRD_AoESecondWindThreshold = "BRD_AoESecondWindThreshold",
-            BRD_VariantCure = "BRD_VariantCure",
-            BRDPvP_HarmonicArrowCharges = "BRDPvP_HarmonicArrowCharges";
+        public static UserInt
+            BRD_RagingJawsRenewTime = new("ragingJawsRenewTime"),
+            BRD_NoWasteHPPercentage = new("noWasteHpPercentage"),
+            BRD_AoENoWasteHPPercentage = new("AoENoWasteHpPercentage"),
+            BRD_STSecondWindThreshold = new("BRD_STSecondWindThreshold"),
+            BRD_AoESecondWindThreshold = new("BRD_AoESecondWindThreshold"),
+            BRD_VariantCure = new("BRD_VariantCure"),
+            BRDPvP_HarmonicArrowCharges = new("BRDPvP_HarmonicArrowCharges"),
+            BRD_Adv_Opener_Selection = new("BRD_Adv_Opener_Selection", 0),
+            BRD_Balance_Content = new("BRD_Balance_Content", 1);
 
         internal static void Draw(CustomComboPreset preset)
         {
             switch (preset)
             {
+                case CustomComboPreset.BRD_ST_Adv_Balance_Standard:
+                    DrawRadioButton(BRD_Adv_Opener_Selection, $"Standard Opener", "", 0);
+                    DrawRadioButton(BRD_Adv_Opener_Selection, $"2.48 Adjusted Standard Opener", "", 1);
+                    DrawRadioButton(BRD_Adv_Opener_Selection, $"2.49 Standard Comfy", "", 2);
+
+                    DrawBossOnlyChoice(BRD_Balance_Content);
+                    break;                
+
                 case CustomComboPreset.BRD_Adv_RagingJaws:
                     DrawSliderInt(3, 10, BRD_RagingJawsRenewTime,
                         "Remaining time (In seconds). Recommended 5, increase little by little if refresh is outside of radiant window");
@@ -31,7 +43,7 @@ internal partial class BRD
                     break;
 
                 case CustomComboPreset.BRD_AoE_Adv_NoWaste:
-                    DrawSliderInt(1, 10, BRD_AoENoWasteHPPercentage,
+                    DrawSliderInt(1, 50, BRD_AoENoWasteHPPercentage,
                         "Remaining target HP percentage");
 
                     break;

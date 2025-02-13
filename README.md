@@ -154,20 +154,11 @@ To enable this:
 2. Go to the "Config" tab.
 3. Expand the "Duty Config" section.
 4. Enable "Auto Manage Rotation Plugin State".
+5. (Also check "> Wrath Config Options <" -> "Auto setup jobs for autorotation")
 
-You will still need to configure Wrath Combo's Auto-Rotation settings and what 
-combos you have set to be enabled in it as normal, AutoDuty will currently on enable
-or disable the Auto-Rotation feature.
-
-1. Open Wrath Combo and navigate to the "Auto-Rotation" tab.
-    - Configure your Auto-Rotation settings as desired.
-2. Navigate to the "PvE Features" tab and select your job.
-    - Enable at least 1 combo, but preferably a Single and Multi-target Combo.
-        - You can use "Simple Mode" combos, or "Advanced Mode" combos and 
-          configure them as desired.
-    - Tick the "Auto-Mode" checkbox to the right of your chosen combos.
-3. AutoDuty will enable Wrath Combo when it commences a duty, and disable it when 
-   it ends.
+By default, AutoDuty will ensure that combos in Wrath are set up, and will lock all
+settings under those combos to `On` if combos were not set up, to ensure that the 
+rotation will run; if you already have your jobs setup, you can disable Option 5 above.
 
   <p align="right"><a href="#top" alt="Back to top"><img src=/res/readme_images/arrowhead-up.png width ="25"/></a></p>
 </section> 
@@ -177,22 +168,26 @@ or disable the Auto-Rotation feature.
 
 # Commands
 
-| **Chat command**                       | **Function**                                                                                                                                                |
-|:---------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `/wrath`                               | Opens the main plugin window, where you can enable/disable features, access settings and more.                                                              |
-| `/wrath auto`                          | Toggles Auto-Rotation **on** or **off**.                                                                                                                    |
-| `/wrath auto STATE`                    | Sets Auto-Rotation to a specific state. Replace `STATE` with `on` or `off`.                                                                                 |
-| `/wrath combo STATE`                   | When toggled off, actions will not be replaced with combos from the plugin.<br>Auto-Rotation will still work. Replace `STATE` with `on`, `off` or `toggle`. |
-| `/wrath toggle INT`                    | Toggles a specific feature/option **on or off** by replacing `INT` with its internal name.<br>Does not work while in combat.                                |
-| `/wrath set INT`                       | Turns a specific feature/option **on** by replacing `INT` with its internal name.<br>Does not work when in combat.                                          |
-| `/wrath unset INT`                     | Turn a specific feature/option **off** by replacing `INT` with its internal name.<br>Does not work while in combat.                                         |
-| `/wrath unsetall`                      | Turns all features and options **off** at once.                                                                                                             |
-| `/wrath list ...`                      | Prints lists of feature's internal names to the game chat based on filter arguments.<br>Requires an appended filter. See Below.                             |
-| `/wrath list set`<br/>`/wrath enabled` | Prints a list of all currently enabled features & options in the game chat.                                                                                 |
-| `/wrath list unset`                    | Prints a list of all currently disabled features & options in the game chat.                                                                                |
-| `/wrath list all`                      | Prints a list of every feature & option in the game chat, regardless of state.                                                                              |
-| `/wrath debug`                         | Outputs a full debug file to your desktop that can be sent to developers for utilisation in bug-fixing.                                                     |
-| `/wrath debug JOB`                     | Outputs a debug file to your desktop containing only job-relevant features/options. <br>Replace `JOB` with the appropriate job abbreviation.                |
+| **Chat command**                       | **Function**                                                                                                                                                                   |
+|:---------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `/wrath`                               | Opens the main plugin window, where you can enable/disable features, access settings and more.                                                                                 |
+| `/wrath <X>`                           | Opens the main plugin window, to a specific job's PvE features.<br>Replace `<X>` with the jobs abbreviation.                                                                   |
+| `/wrath auto`                          | Toggles Auto-Rotation **on** or **off**.                                                                                                                                       |
+| `/wrath auto <X>`                      | Sets Auto-Rotation to a specific state.<br>Replace `<X>` with `on`, `off`, or `toggle`.                                                                                        |
+| `/wrath combo`                         | Toggles action replacing **on** or **off**.<br>When off, actions will not be replaced with combos from the plugin. Auto-Rotation will still work.                              |
+| `/wrath combo <X>`                     | Sets action replacing to a specific state.<br>Replace `<X>` with `on`, `off`, or `toggle`.                                                                                     |
+| `/wrath ignore`                        | Adds a targeted NPC, and all instances of it, to an ignore list for Auto-Rotation's auto-targeting.<br>Manage this list in the Auto-Rotation tab.                              |
+| `/wrath toggle <X>`                    | Toggles a specific feature or option **on** or **off**. Does not work while in combat.<br>Replace `<X>` with its internal name (or ID).                                        |
+| `/wrath set <X>`                       | Turns a specific feature/option **on**. Does not work when in combat.<br>Replace `<X>` with its internal name (or ID).                                                         |
+| `/wrath unset <X>`                     | Turn a specific feature/option **off**. Does not work when in combat.<br>Replace `<X>` with its internal name (or ID).                                                         |
+| `/wrath unsetall`                      | Turns all features and options **off** at once.                                                                                                                                |
+| `/wrath list ...`                      | Prints lists of feature's internal names to the game chat based on filter arguments.<br>Requires an appended filter. See Below.                                                |
+| `/wrath list set`<br/>`/wrath enabled` | Prints a list of all currently enabled features & options in the game chat.                                                                                                    |
+| `/wrath list unset`                    | Prints a list of all currently disabled features & options in the game chat.                                                                                                   |
+| `/wrath list all`                      | Prints a list of every feature & option in the game chat, regardless of state.                                                                                                 |
+| `/wrath debug`                         | Outputs a debug file to your desktop containing only relevant features/options for your current job.<br>To be sent to developers, to help in bug-fixing. Completely anonymous. |
+| `/wrath debug <X>`                     | Outputs a debug file containing only job-relevant features/options.<br>Replace `<X>` with the jobs abbreviation.                                                               |
+| `/wrath debug all`                     | Outputs a debug file containing all features/options.                                                                                                                          |
 
 <p align="right"><a href="#top" alt="Back to top"><img src=/res/readme_images/arrowhead-up.png width ="25"/></a></p>
 </section>
@@ -207,6 +202,10 @@ a [pull request](https://github.com/PunishXIV/WrathCombo/pulls) here on GitHub,
 but ideally get in contact with us over on
 the [Discord](https://discord.gg/Zzrcc8kmvy) server so we can communicate with one
 another to make any necessary changes and review your submission!
+
+You may also find [contributing info](CONTRIBUTING.md) and
+[available guides](CONTRIBUTING.md#guides-on-using-specific-parts-of-wrath) helpful
+in getting started.
 
    <p align="right"><a href="#top" alt="Back to top"><img src=/res/readme_images/arrowhead-up.png width ="25"/></a></p>
 </section>

@@ -47,12 +47,12 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.SMNPvP_BurstMode;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is Ruin3)
                 {
                     #region Types
-                    bool canWeave = CanWeave(actionID);
+                    bool canWeave = CanWeave();
                     bool bahamutBurst = OriginalHook(Ruin3) is AstralImpulse;
                     bool phoenixBurst = OriginalHook(Ruin3) is FountainOfFire;
                     double playerHP = PlayerHealthPercentageHp();
@@ -60,7 +60,7 @@ namespace WrathCombo.Combos.PvP
                     int radiantThreshold = PluginConfiguration.GetCustomIntValue(Config.SMNPvP_RadiantAegisThreshold);
                     #endregion
 
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
                         if (canWeave)
                         {
@@ -91,7 +91,7 @@ namespace WrathCombo.Combos.PvP
                             return MountainBuster;
 
                         // Garuda (check Slipstream cooldown)
-                        if (IsEnabled(CustomComboPreset.SMNPvP_BurstMode_Slipstream) && IsOffCooldown(Slipstream) && !IsMoving)
+                        if (IsEnabled(CustomComboPreset.SMNPvP_BurstMode_Slipstream) && IsOffCooldown(Slipstream) && !IsMoving())
                             return Slipstream;
                     }
                 }

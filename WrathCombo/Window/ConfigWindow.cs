@@ -8,6 +8,7 @@ using PunishLib;
 using PunishLib.ImGuiMethods;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Colors;
@@ -25,12 +26,12 @@ namespace WrathCombo.Window
     {
         internal static readonly Dictionary<string, List<(CustomComboPreset Preset, CustomComboInfoAttribute Info)>> groupedPresets = GetGroupedPresets();
         internal static readonly Dictionary<CustomComboPreset, (CustomComboPreset Preset, CustomComboInfoAttribute Info)[]> presetChildren = GetPresetChildren();
-
+        internal static int currentPreset = 1;
         internal static Dictionary<string, List<(CustomComboPreset Preset, CustomComboInfoAttribute Info)>> GetGroupedPresets()
         {
             return Enum
             .GetValues<CustomComboPreset>()
-            .Where(preset => (int)preset > 100 && preset != CustomComboPreset.Disabled)
+            .Where(preset => (int)preset > 100)
             .Select(preset => (Preset: preset, Info: preset.GetAttribute<CustomComboInfoAttribute>()))
             .Where(tpl => tpl.Info != null && PresetStorage.GetParent(tpl.Preset) == null)
             .OrderByDescending(tpl => tpl.Info.JobID == 0)
@@ -114,7 +115,23 @@ namespace WrathCombo.Window
 
             using (var leftChild = ImRaii.Child($"###WrathLeftSide", regionSize with { Y = topLeftSideHeight }, false, ImGuiWindowFlags.NoDecoration))
             {
-                if (ThreadLoadImageHandler.TryGetTextureWrap(PunishLibMain.PluginManifest.IconUrl ?? "", out var logo)) //todo update
+                string? imagePath;
+                try
+                {
+                    // Use the local image over a remote one
+                    imagePath = Path.Combine(
+                        Svc.PluginInterface.AssemblyLocation.Directory?.FullName!,
+                        "images\\wrathcombo.png");
+                    if (!File.Exists(imagePath))
+                        throw new FileNotFoundException();
+                }
+                catch (Exception)
+                {
+                    // Fallback to the remote icon if there are any issues
+                    imagePath = PunishLibMain.PluginManifest.IconUrl ?? "";
+                }
+
+                if (ThreadLoadImageHandler.TryGetTextureWrap(imagePath, out var logo))
                 {
                     ImGuiEx.LineCentered("###WrathLogo", () =>
                     {
@@ -135,14 +152,16 @@ namespace WrathCombo.Window
                     OpenWindow = OpenWindow.PvP;
                 }
                 ImGui.Spacing();
-                if (ImGui.Selectable("Misc. Settings", OpenWindow == OpenWindow.Settings))
-                {
-                    OpenWindow = OpenWindow.Settings;
-                }
-                ImGui.Spacing();
                 if (ImGui.Selectable("Auto-Rotation", OpenWindow == OpenWindow.AutoRotation))
                 {
                     OpenWindow = OpenWindow.AutoRotation;
+                }
+                ImGui.Spacing();
+                ImGui.Spacing();
+                ImGui.Spacing();
+                if (ImGui.Selectable("Settings", OpenWindow == OpenWindow.Settings))
+                {
+                    OpenWindow = OpenWindow.Settings;
                 }
                 ImGui.Spacing();
                 if (ImGui.Selectable("About", OpenWindow == OpenWindow.About))
@@ -151,6 +170,8 @@ namespace WrathCombo.Window
                 }
 
 #if DEBUG
+                ImGui.Spacing();
+                ImGui.Spacing();
                 ImGui.Spacing();
                 if (ImGui.Selectable("DEBUG", OpenWindow == OpenWindow.Debug))
                 {

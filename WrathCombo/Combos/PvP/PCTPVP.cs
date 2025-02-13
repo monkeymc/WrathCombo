@@ -43,10 +43,10 @@ namespace WrathCombo.Combos.PvP
         internal class PCTPvP_Burst : CustomCombo
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.PCTPvP_Burst;
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 #region Variables
-                bool isMoving = IsMoving;
+                bool isMoving = IsMoving();
                 bool hasTarget = HasTarget();
                 bool hasStarPrism = HasEffect(Buffs.Starstruck);
                 bool hasSubtractivePalette = HasEffect(Buffs.SubtractivePalette);
@@ -67,7 +67,7 @@ namespace WrathCombo.Combos.PvP
                             return OriginalHook(TemperaCoat);
                     }
 
-                    if (hasTarget && !PvPCommon.IsImmuneToDamage())
+                    if (hasTarget && !PvPCommon.TargetImmuneToDamage())
                     {
                         // Star Prism
                         if (IsEnabled(CustomComboPreset.PCTPvP_StarPrism))

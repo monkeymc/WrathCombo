@@ -38,14 +38,14 @@ namespace WrathCombo.Combos.PvP
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.SGEPvP_BurstMode;
 
-            protected override uint Invoke(uint actionID, uint lastComboActionID, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID == Dosis)
                 {
                     if (IsEnabled(CustomComboPreset.SGEPvP_BurstMode_KardiaReminder) && !HasEffectAny(Buffs.Kardia))
                         return Kardia;
 
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
                         // Psyche after Phlegma
                         if (IsEnabled(CustomComboPreset.SGEPvP_BurstMode_Psyche) && WasLastSpell(Phlegma))

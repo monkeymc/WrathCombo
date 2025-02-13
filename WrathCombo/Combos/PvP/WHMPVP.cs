@@ -1,4 +1,7 @@
-﻿using WrathCombo.CustomComboNS;
+﻿using Dalamud.Game.ClientState.Objects.Types;
+using ECommons.DalamudServices;
+using WrathCombo.CustomComboNS;
+using WrathCombo.CustomComboNS.Functions;
 
 namespace WrathCombo.Combos.PvP
 {
@@ -13,7 +16,8 @@ namespace WrathCombo.Combos.PvP
             AfflatusMisery = 29226,
             Aquaveil = 29227,
             MiracleOfNature = 29228,
-            SeraphStrike = 29229;
+            SeraphStrike = 29229,
+            AfflatusPurgation = 29230;
 
         internal class Buffs
         {
@@ -22,16 +26,26 @@ namespace WrathCombo.Combos.PvP
                 SacredSight = 4326;
         }
 
+        internal class Config
+        {
+            internal static UserInt
+                WHMPVP_HealOrder = new("WHMPVP_HealOrder");
+        }
+
         internal class WHMPvP_Burst : CustomCombo
         {
             protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.WHMPvP_Burst;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
                 if (actionID is Glare)
                 {
-                    if (!PvPCommon.IsImmuneToDamage())
+                    if (!PvPCommon.TargetImmuneToDamage())
                     {
+                        var tar = OptionalTarget as IBattleChara ?? Svc.Targets.Target as IBattleChara;
+                        if (IsEnabled(CustomComboPreset.WHMPvP_AfflatusPurgation) && LimitBreakLevel == 1 && tar?.CurrentHp <= 40000)
+                            return AfflatusPurgation;
+
                         // Afflatus Misery if enabled and off cooldown
                         if (IsEnabled(CustomComboPreset.WHMPvP_Afflatus_Misery) && IsOffCooldown(AfflatusMisery))
                             return AfflatusMisery;
@@ -41,7 +55,7 @@ namespace WrathCombo.Combos.PvP
                             return OriginalHook(SeraphStrike);
 
                         // Weave conditions
-                        if (CanWeave(actionID))
+                        if (CanWeave())
                         {
                             // Miracle of Nature if enabled and off cooldown and inrange 
                             if (IsEnabled(CustomComboPreset.WHMPvP_Mirace_of_Nature) && IsOffCooldown(MiracleOfNature) && InActionRange(MiracleOfNature))
@@ -59,25 +73,33 @@ namespace WrathCombo.Combos.PvP
         }
         internal class WHMPvP_Aquaveil : CustomCombo
         {
-            protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.WHMPvP_Aquaveil;
+            protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.WHMPvP_Heals;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
+            protected override uint Invoke(uint actionID)
             {
-                if (actionID is Cure2 && IsOffCooldown(Aquaveil))
-                    return Aquaveil;
+                if (actionID is Cure2)
+                {
+                    bool aquaveil = IsEnabled(CustomComboPreset.WHMPvP_Aquaveil) && IsOffCooldown(Aquaveil);
+                    bool cure3 = IsEnabled(CustomComboPreset.WHMPvP_Cure3) && HasEffect(Buffs.Cure3Ready);
 
-                return actionID;
-            }
-        }
+                    if (Config.WHMPVP_HealOrder == 0)
+                    {
+                        if (aquaveil)
+                            return Aquaveil;
 
-        internal class WHMPvP_Cure3 : CustomCombo
-        {
-            protected internal override CustomComboPreset Preset { get; } = CustomComboPreset.WHMPvP_Cure3;
+                        if (cure3)
+                            return Cure3;
+                    }
+                    else
+                    {
+                        if (cure3)
+                            return Cure3;
 
-            protected override uint Invoke(uint actionID, uint lastComboMove, float comboTime, byte level)
-            {
-                if (actionID is Cure2 && HasEffect(Buffs.Cure3Ready))
-                    return Cure3;
+                        if (aquaveil)
+                            return Aquaveil;
+                    }
+                    
+                }
 
                 return actionID;
             }
