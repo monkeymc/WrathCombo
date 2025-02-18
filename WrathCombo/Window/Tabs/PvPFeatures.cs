@@ -133,10 +133,10 @@ namespace WrathCombo.Window.Tabs
                         continue;
                     }
 
-                    if (conflictOriginals.Any(x => PresetStorage.IsEnabled(x)))
+                    if (conflictOriginals.Any(PresetStorage.IsEnabled))
                     {
-                        Service.Configuration.EnabledActions.Remove(preset);
-                        Service.Configuration.Save();
+                        if (Service.Configuration.EnabledActions.Remove(preset))
+                            Service.Configuration.Save();
 
                         // Keep removed items in the counter
                         var parent = PresetStorage.GetParent(preset) ?? preset;

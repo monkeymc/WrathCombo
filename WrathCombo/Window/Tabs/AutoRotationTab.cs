@@ -220,6 +220,14 @@ namespace WrathCombo.Window.Tabs
                 var autoRez = (bool)P.IPC.GetAutoRotationConfigState(AutoRotationConfigOption.AutoRez)!;
                 if (autoRez)
                 {
+                    ImGuiExtensions.Prefix(false);
+                    changed |= ImGui.Checkbox("Require Swiftcast/Dualcast", ref
+                        cfg.HealerSettings.AutoRezRequireSwift);
+                    ImGuiComponents.HelpMarker(
+                        $"Requires {All.Swiftcast.ActionName()} " +
+                        $"(or {RDM.JobID.JobAbbreviation()}'s Dualcast) " +
+                        $"to be available to resurrect a party member, to avoid hard-casting.");
+
                     ImGuiExtensions.Prefix(true);
                     P.UIHelper.ShowIPCControlledIndicatorIfNeeded("AutoRezDPSJobs");
                     changed |= P.UIHelper.ShowIPCControlledCheckboxIfNeeded(

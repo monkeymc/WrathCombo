@@ -26,7 +26,7 @@ namespace WrathCombo.CustomComboNS
 
         private void UpdateOpener(Dalamud.Plugin.Services.IFramework framework)
         {
-            if (!Service.IconReplacer.getIconHook.IsEnabled)
+            if (!Service.ActionReplacer.getActionHook.IsEnabled)
             {
                 uint _ = 0;
                 FullOpener(ref _);
@@ -225,7 +225,8 @@ namespace WrathCombo.CustomComboNS
                         CurrentOpenerAction = OpenerActions[OpenerStep - 1];
                     }
 
-                    while (OpenerStep > 1 && !ActionReady(CurrentOpenerAction) && ActionWatching.TimeSinceLastAction.TotalSeconds > Math.Max(3, GCDTotal))
+                    while (OpenerStep > 1 && !ActionReady(CurrentOpenerAction) &&
+                           ActionWatching.TimeSinceLastAction.TotalSeconds > Math.Max(1.5, GCDTotal))
                     {
                         if (OpenerStep >= OpenerActions.Count)
                             break;

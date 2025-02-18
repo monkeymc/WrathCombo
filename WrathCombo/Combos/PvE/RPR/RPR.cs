@@ -15,7 +15,9 @@ internal partial class RPR
                 return actionID;
             
             //Soulsow
-            if (!HasEffect(Buffs.Soulsow) && !PartyInCombat())
+            if (LevelChecked(Soulsow) &&
+                !HasEffect(Buffs.Soulsow) && 
+                !PartyInCombat())
                 return Soulsow;
 
             //Variant Cure
@@ -194,6 +196,7 @@ internal partial class RPR
 
             //Soulsow
             if (IsEnabled(CustomComboPreset.RPR_ST_SoulSow) &&
+                LevelChecked(Soulsow) && 
                 !HasEffect(Buffs.Soulsow) && !PartyInCombat())
                 return Soulsow;
 

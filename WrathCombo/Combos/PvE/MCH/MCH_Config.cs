@@ -15,9 +15,10 @@ internal partial class MCH
             MCH_AoE_TurretUsage = new("MCH_AoE_TurretUsage", 100),
             MCH_ST_TurretUsage = new("MCH_ST_TurretUsage", 100),
             MCH_ST_ReassemblePool = new("MCH_ST_ReassemblePool", 0),
+            MCH_ST_GaussRicoPool = new("MCH_ST_GaussRicoPool", 0),
             MCH_AoE_ReassemblePool = new("MCH_AoE_ReassemblePool", 0),
-            MCH_ST_WildfireHP = new("MCH_ST_WildfireHP", 1),
-            MCH_ST_HyperchargeHP = new("MCH_ST_HyperchargeHP", 1),
+            MCH_ST_WildfireHP = new("MCH_ST_WildfireHP", 0),
+            MCH_ST_HyperchargeHP = new("MCH_ST_HyperchargeHP", 0),
             MCH_ST_QueenOverDrive = new("MCH_ST_QueenOverDrive"),
             MCH_Balance_Content = new("MCH_Balance_Content", 1),
             MCH_ST_Adv_Excavator_SubOption = new("MCH_ST_Adv_Excavator_SubOption", 1),
@@ -105,8 +106,12 @@ internal partial class MCH
 
                     break;
 
-                case CustomComboPreset.MCH_ST_Adv_Reassemble:
+                case CustomComboPreset.MCH_ST_Adv_GaussRicochet:
+                    DrawSliderInt(0, 2, MCH_ST_GaussRicoPool, "Number of Charges to Save for Manual Use");
 
+                    break;
+
+                case CustomComboPreset.MCH_ST_Adv_Reassemble:
                     DrawSliderInt(0, 1, MCH_ST_ReassemblePool, "Number of Charges to Save for Manual Use");
 
                     DrawHorizontalMultiChoice(MCH_ST_Reassembled, $"Use on {ActionWatching.GetActionName(Excavator)}", "", 5, 0);
@@ -118,7 +123,6 @@ internal partial class MCH
                     break;
 
                 case CustomComboPreset.MCH_AoE_Adv_Reassemble:
-
                     DrawSliderInt(0, 1, MCH_AoE_ReassemblePool, "Number of Charges to Save for Manual Use");
 
                     DrawHorizontalMultiChoice(MCH_AoE_Reassembled, $"Use on {ActionWatching.GetActionName(SpreadShot)}/{ActionWatching.GetActionName(Scattergun)}", "", 4, 0);

@@ -2,7 +2,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Dalamud.Game.ClientState.JobGauge.Types;
+using Dalamud.Game.ClientState.Objects.Types;
+using WrathCombo.AutoRotation;
 using WrathCombo.CustomComboNS;
 using WrathCombo.CustomComboNS.Functions;
 using WrathCombo.Data;
@@ -43,6 +46,42 @@ internal partial class DRK
     ///     DRK's job gauge.
     /// </summary>
     private static DRKGauge Gauge => GetJobGauge<DRKGauge>();
+
+    /// <summary>
+    ///     DRK's GCD, truncated to two decimal places.
+    /// </summary>
+    private static double GCD => GetCooldown(HardSlash).CooldownTotal;
+
+    /// <summary>
+    ///     Method for getting the player's target more reliably.
+    /// </summary>
+    /// <param name="flags">
+    ///     The flags to describe the combo executing this method.
+    /// </param>
+    /// <param name="restrictToHostile">
+    ///     Whether to restrict the target to hostile targets.<br />
+    ///     Defaults to <c>true</c>.
+    /// </param>
+    /// <returns>
+    ///     The player's current target, or the nearest target if AoE.
+    /// </returns>
+    private static IGameObject? Target(Combo flags, bool restrictToHostile = true)
+    {
+        switch (restrictToHostile)
+        {
+            case true when LocalPlayer.TargetObject is IBattleChara:
+            case false when LocalPlayer.TargetObject is not null:
+                return LocalPlayer.TargetObject;
+        }
+
+        if (flags.HasFlag(Combo.AoE))
+            return AutoRotationController.DPSTargeting.BaseSelection
+                .OrderByDescending(
+                    x => GetTargetDistance(x))
+                .FirstOrDefault();
+
+        return null;
+    }
 
     /// <summary>
     ///     Select the opener to use.
@@ -174,6 +213,8 @@ internal partial class DRK
     /// </remarks>
     private class Cooldown : IActionProvider
     {
+        public static bool ShouldDeliriumNext;
+
         public bool TryGetAction(Combo flags, ref uint action)
         {
             #region Disesteem
@@ -210,7 +251,8 @@ internal partial class DRK
                 : Config.DRK_AoE_LivingShadowThreshold;
             var shadowHPMatchesThreshold =
                 flags.HasFlag(Combo.Simple) || !shadowInHPContent ||
-                (shadowInHPContent && GetTargetHPPercent() > shadowHPThreshold);
+                (shadowInHPContent &&
+                 GetTargetHPPercent(Target(flags)) > shadowHPThreshold);
 
             #endregion
 
@@ -262,7 +304,8 @@ internal partial class DRK
                 : Config.DRK_AoE_DeliriumThreshold;
             var deliriumHPMatchesThreshold =
                 flags.HasFlag(Combo.Simple) || !deliriumInHPContent ||
-                (deliriumInHPContent && GetTargetHPPercent() > deliriumHPThreshold);
+                (deliriumInHPContent &&
+                 GetTargetHPPercent(Target(flags)) > deliriumHPThreshold);
 
             #endregion
 
@@ -271,9 +314,17 @@ internal partial class DRK
                    IsEnabled(Preset.DRK_ST_CD_Delirium)) ||
                   flags.HasFlag(Combo.AoE) &&
                   IsEnabled(Preset.DRK_AoE_CD_Delirium))) &&
-                ActionReady(BloodWeapon) &&
-                deliriumHPMatchesThreshold)
+                deliriumHPMatchesThreshold &&
+                LevelChecked(BloodWeapon) &&
+                GetCooldownRemainingTime(BloodWeapon) < GCD)
+                ShouldDeliriumNext = true;
+
+            if (ShouldDeliriumNext &&
+                IsOffCooldown(BloodWeapon))
+            {
+                ShouldDeliriumNext = false;
                 return (action = OriginalHook(Delirium)) != 0;
+            }
 
             #endregion
 
@@ -288,6 +339,12 @@ internal partial class DRK
                 (flags.HasFlag(Combo.Adv) && flags.HasFlag(Combo.AoE) &&
                  IsEnabled(Preset.DRK_AoE_CD_SaltStill) && !IsMoving() &&
                  CombatEngageDuration().TotalSeconds >= 7);
+            var saltHPThreshold =
+                flags.HasFlag(Combo.AoE)
+                    ? flags.HasFlag(Combo.Adv)
+                        ? Config.DRK_AoE_SaltThreshold
+                        : 30
+                    : 100;
 
             #endregion
 
@@ -297,7 +354,8 @@ internal partial class DRK
                 LevelChecked(SaltedEarth) &&
                 IsOffCooldown(SaltedEarth) &&
                 !HasEffect(Buffs.SaltedEarth) &&
-                saltStill)
+                saltStill &&
+                GetTargetHPPercent(Target(flags)) >= saltHPThreshold)
                 return (action = SaltedEarth) != 0;
 
             #endregion
@@ -325,7 +383,8 @@ internal partial class DRK
                  !IsEnabled(Preset.DRK_ST_CD_BringerBurst)) ||
                 (flags.HasFlag(Combo.Adv) && flags.HasFlag(Combo.ST) &&
                  IsEnabled(Preset.DRK_ST_CD_BringerBurst) &&
-                 IsOnCooldown(LivingShadow) && !HasEffect(Buffs.Scorn));
+                 GetCooldownRemainingTime(LivingShadow) >= 90 &&
+                 !HasEffect(Buffs.Scorn));
 
             #endregion
 
@@ -351,10 +410,19 @@ internal partial class DRK
 
             #region Abyssal Drain (AoE only)
 
+            #region Variables
+
+            var drainHPThreshold = flags.HasFlag(Combo.Adv)
+                ? Config.DRK_AoE_DrainThreshold
+                : 60;
+
+            #endregion
+
             if (flags.HasFlag(Combo.AoE) &&
                 (flags.HasFlag(Combo.Simple) ||
                  IsEnabled(Preset.DRK_AoE_CD_Drain)) &&
-                ActionReady(AbyssalDrain))
+                ActionReady(AbyssalDrain) &&
+                PlayerHealthPercentageHp() <= drainHPThreshold)
                 return (action = AbyssalDrain) != 0;
 
             #endregion
@@ -450,12 +518,13 @@ internal partial class DRK
             #endregion
 
             if ((flags.HasFlag(Combo.Simple) ||
-                 ((flags.HasFlag(Combo.ST) && IsEnabled(Preset.DRK_ST_Mit_LivingDead)) ||
+                 ((flags.HasFlag(Combo.ST) &&
+                   IsEnabled(Preset.DRK_ST_Mit_LivingDead)) ||
                   flags.HasFlag(Combo.AoE) &&
                   IsEnabled(Preset.DRK_AoE_Mit_LivingDead))) &&
                 ActionReady(LivingDead) &&
                 PlayerHealthPercentageHp() <= livingDeadSelfThreshold &&
-                GetTargetHPPercent() >= livingDeadTargetThreshold &&
+                GetTargetHPPercent(Target(flags)) >= livingDeadTargetThreshold &&
                 // Checking if the target matches the boss avoidance option
                 ((bossRestrictionLivingDead is (int)Config.BossAvoidance.On &&
                   InBossEncounter()) ||
@@ -483,13 +552,13 @@ internal partial class DRK
 
             #region Variables
 
-            var oblationCharges = flags.HasFlag(Combo.Adv) ?
-                flags.HasFlag(Combo.ST)
+            var oblationCharges = flags.HasFlag(Combo.Adv)
+                ? flags.HasFlag(Combo.ST)
                     ? Config.DRK_ST_OblationCharges
                     : Config.DRK_AoE_OblationCharges
                 : 0;
-            var oblationThreshold = flags.HasFlag(Combo.Adv) ?
-                flags.HasFlag(Combo.ST)
+            var oblationThreshold = flags.HasFlag(Combo.Adv)
+                ? flags.HasFlag(Combo.ST)
                     ? Config.DRK_ST_Mit_OblationThreshold
                     : Config.DRK_AoE_Mit_OblationThreshold
                 : 90;
@@ -497,8 +566,10 @@ internal partial class DRK
             #endregion
 
             if ((flags.HasFlag(Combo.Simple) ||
-                 ((flags.HasFlag(Combo.ST) && IsEnabled(Preset.DRK_ST_Mit_Oblation)) ||
-                  flags.HasFlag(Combo.AoE) && IsEnabled(Preset.DRK_AoE_Mit_Oblation))) &&
+                 ((flags.HasFlag(Combo.ST) &&
+                   IsEnabled(Preset.DRK_ST_Mit_Oblation)) ||
+                  flags.HasFlag(Combo.AoE) &&
+                  IsEnabled(Preset.DRK_AoE_Mit_Oblation))) &&
                 ActionReady(Oblation) &&
                 !HasEffectAny(Buffs.Oblation) &&
                 GetRemainingCharges(Oblation) > oblationCharges &&
@@ -528,8 +599,10 @@ internal partial class DRK
             #endregion
 
             if ((flags.HasFlag(Combo.Simple) ||
-                 ((flags.HasFlag(Combo.ST) && IsEnabled(Preset.DRK_ST_Mit_Reprisal)) ||
-                  flags.HasFlag(Combo.AoE) && IsEnabled(Preset.DRK_AoE_Mit_Reprisal))) &&
+                 ((flags.HasFlag(Combo.ST) &&
+                   IsEnabled(Preset.DRK_ST_Mit_Reprisal)) ||
+                  flags.HasFlag(Combo.AoE) &&
+                  IsEnabled(Preset.DRK_AoE_Mit_Reprisal))) &&
                 ActionReady(All.Reprisal) &&
                 reprisalTargetHasNoDebuff &&
                 reprisalUseForRaidwides &&
@@ -619,7 +692,8 @@ internal partial class DRK
 
             if ((flags.HasFlag(Combo.Simple) ||
                  ((flags.HasFlag(Combo.ST) && IsEnabled(Preset.DRK_ST_Mit_Vigil)) ||
-                  flags.HasFlag(Combo.AoE) && IsEnabled(Preset.DRK_AoE_Mit_Vigil))) &&
+                  flags.HasFlag(Combo.AoE) &&
+                  IsEnabled(Preset.DRK_AoE_Mit_Vigil))) &&
                 ActionReady(ShadowedVigil) &&
                 PlayerHealthPercentageHp() <= vigilHealthThreshold)
                 return (action = OriginalHook(ShadowWall)) != 0;
@@ -666,6 +740,22 @@ internal partial class DRK
     {
         public bool TryGetAction(Combo flags, ref uint action)
         {
+            if (TryGetManaAction(flags, ref action)) return true;
+            if (TryGetBloodAction(flags, ref action)) return true;
+
+            return false;
+        }
+
+        private bool TryGetBloodAction(Combo flags, ref uint action)
+        {
+            #region Variables
+
+            var bloodGCDReady =
+                LevelChecked(Bloodspiller) &&
+                GetCooldownRemainingTime(Bloodspiller) < GCD;
+
+            #endregion
+
             #region Delirium Chain
 
             if ((flags.HasFlag(Combo.Simple) ||
@@ -673,15 +763,14 @@ internal partial class DRK
                    IsEnabled(Preset.DRK_ST_Sp_ScarletChain)) ||
                   flags.HasFlag(Combo.AoE) &&
                   IsEnabled(Preset.DRK_AoE_Sp_ImpalementChain))) &&
-                HasEffect(Buffs.EnhancedDelirium))
+                HasEffect(Buffs.EnhancedDelirium) &&
+                bloodGCDReady)
                 if (flags.HasFlag(Combo.ST))
                     return (action = OriginalHook(Bloodspiller)) != 0;
                 else if (flags.HasFlag(Combo.AoE))
                     return (action = OriginalHook(Quietus)) != 0;
 
             #endregion
-
-            // Blood
 
             #region Blood Spending during Delirium (Lower Levels)
 
@@ -690,11 +779,12 @@ internal partial class DRK
                   IsEnabled(Preset.DRK_AoE_Sp_Quietus)) ||
                  (flags.HasFlag(Combo.ST) &&
                   IsEnabled(Preset.DRK_ST_Sp_Bloodspiller))) &&
-                GetBuffStacks(Buffs.Delirium) > 0)
+                GetBuffStacks(Buffs.Delirium) > 0 &&
+                bloodGCDReady)
                 if (flags.HasFlag(Combo.ST))
-                    return (action = Bloodspiller) != 0;
+                    return (action = OriginalHook(Bloodspiller)) != 0;
                 else if (flags.HasFlag(Combo.AoE))
-                    return (action = Quietus) != 0;
+                    return (action = OriginalHook(Quietus)) != 0;
 
             #endregion
 
@@ -705,8 +795,9 @@ internal partial class DRK
                  (flags.HasFlag(Combo.Adv) &&
                   IsEnabled(Preset.DRK_ST_CD_Delirium))) &&
                 LevelChecked(Delirium) &&
-                Gauge.Blood >= 60 &&
-                GetCooldownRemainingTime(Delirium) is > 0 and < 7)
+                Gauge.Blood >= 70 &&
+                Cooldown.ShouldDeliriumNext &&
+                bloodGCDReady)
                 return (action = Bloodspiller) != 0;
 
             #endregion
@@ -720,7 +811,8 @@ internal partial class DRK
                   IsEnabled(Preset.DRK_ST_Sp_Bloodspiller))) &&
                 LevelChecked(Bloodspiller) &&
                 Gauge.Blood >= 50 &&
-                GetCooldownRemainingTime(Delirium) > 37)
+                GetCooldownRemainingTime(Delirium) > 37 &&
+                bloodGCDReady)
                 if (flags.HasFlag(Combo.ST))
                     return (action = Bloodspiller) != 0;
                 else if (flags.HasFlag(Combo.AoE) && LevelChecked(Quietus))
@@ -746,7 +838,8 @@ internal partial class DRK
                   flags.HasFlag(Combo.AoE) &&
                   IsEnabled(Preset.DRK_AoE_Sp_BloodOvercap))) &&
                 LevelChecked(Bloodspiller) &&
-                Gauge.Blood >= overcapThreshold)
+                Gauge.Blood >= overcapThreshold &&
+                bloodGCDReady)
                 if (flags.HasFlag(Combo.ST))
                     return (action = Bloodspiller) != 0;
                 else if (flags.HasFlag(Combo.AoE) && LevelChecked(Quietus))
@@ -754,16 +847,20 @@ internal partial class DRK
 
             #endregion
 
-            // Mana
+            return false;
+        }
+
+        private bool TryGetManaAction(Combo flags, ref uint action)
+        {
+            // Bail if we can't weave anything else
+            if (!CanWeave) return false;
 
             #region Variables and some Mana bails
 
             // Bail if it is too early into the fight
             if (CombatEngageDuration().TotalSeconds <= 5) return false;
-            // Bail if we can't weave anything else
-            if (!CanWeave) return false;
-            // Bail if mana spending is not available
-            if (!ActionReady(FloodOfDarkness)) return false;
+            // Bail if mana spending is not available yet
+            if (!LevelChecked(FloodOfDarkness)) return false;
 
             var mana = (int)LocalPlayer.CurrentMp;
             var manaPooling =
@@ -778,7 +875,8 @@ internal partial class DRK
             var manaEvenBurstSoon =
                 GetCooldownRemainingTime(LivingShadow) is > 0 and < 30;
             var manaBursting =
-                GetCooldownRemainingTime(LivingShadow) >= 90;
+                GetCooldownRemainingTime(LivingShadow) >= 100 ||
+                GetCooldownRemainingTime(Delirium) >= 50;
             var manaDarksideDropping =
                 Gauge.DarksideTimeRemaining / 1000 < 10;
 
@@ -819,10 +917,10 @@ internal partial class DRK
             #region Mana Darkside Maintenance
 
             if (flags.HasFlag(Combo.Simple) ||
-                 flags.HasFlag(Combo.AoE) ||
-                 (flags.HasFlag(Combo.ST) &&
-                  IsEnabled(Preset.DRK_ST_Sp_EdgeDarkside)) &&
-                 manaDarksideDropping)
+                flags.HasFlag(Combo.AoE) ||
+                (flags.HasFlag(Combo.ST) &&
+                 IsEnabled(Preset.DRK_ST_Sp_EdgeDarkside)) &&
+                manaDarksideDropping)
                 if (flags.HasFlag(Combo.ST) && LevelChecked(EdgeOfDarkness))
                     return (action = OriginalHook(EdgeOfDarkness)) != 0;
                 else
@@ -1103,6 +1201,15 @@ internal partial class DRK
 
     #region Openers
 
+    private static void handleEdgeCasts
+        (uint currentAction, ref uint action, uint[] castLocations)
+    {
+        if (castLocations.Contains(currentAction) &&
+            (Gauge.HasDarkArts || LocalPlayer.CurrentMp > 3000) &&
+            CanWeave() && !ActionWatching.HasDoubleWeaved())
+            action = OriginalHook(EdgeOfDarkness);
+    }
+
     internal static DRKOpenerMaxLevel1 Opener1 = new();
 
     internal class DRKOpenerMaxLevel1 : WrathOpener
@@ -1114,25 +1221,25 @@ internal partial class DRK
         public override List<uint> OpenerActions { get; set; } =
         [
             HardSlash,
-            EdgeOfShadow,
+            EdgeOfShadow, // Not handled like a procc, since it sets up Darkside
             LivingShadow,
             SyphonStrike,
             Souleater, // 5
             Delirium,
             Disesteem,
             SaltedEarth,
-            EdgeOfShadow, // Depends on TBN pop
-            ScarletDelirium, // 10
-            Shadowbringer,
-            EdgeOfShadow,
+            //EdgeOfShadow, // Handled like a procc
+            ScarletDelirium,
+            Shadowbringer, // 10
+            //EdgeOfShadow, // Handled like a procc
             Comeuppance,
             CarveAndSpit,
-            EdgeOfShadow, // 15
+            //EdgeOfShadow, // Handled like a procc
             Torcleaver,
             Shadowbringer,
-            EdgeOfShadow,
-            Bloodspiller,
-            SaltAndDarkness, // 20
+            //EdgeOfShadow, // Handled like a procc
+            Bloodspiller, // 15
+            SaltAndDarkness,
         ];
 
         internal override UserData? ContentCheckConfig =>
@@ -1330,12 +1437,12 @@ internal partial class DRK
     private enum Combo
     {
         // Target-type for combo
-        ST = 0,
-        AoE = 1,
+        ST = 1 << 0, // 1
+        AoE = 1 << 1, // 2
 
         // Complexity of combo
-        Adv = 2,
-        Simple = 4,
+        Adv = 1 << 2, // 4
+        Simple = 1 << 3, // 8
     }
 
     private interface IActionProvider

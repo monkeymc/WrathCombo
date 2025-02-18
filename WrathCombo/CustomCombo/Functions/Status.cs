@@ -1,4 +1,5 @@
-﻿using Dalamud.Game.ClientState.Objects.Types;
+﻿using System;
+using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.GameHelpers;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using System.Collections.Generic;
@@ -184,18 +185,25 @@ namespace WrathCombo.CustomComboNS.Functions
             return false;
         }
 
-
-        public static bool HasCleansableDebuff(IGameObject? OurTarget = null)
+        public static bool HasCleansableDebuff(IGameObject? target = null)
         {
-            OurTarget ??= CurrentTarget;
-            if ((OurTarget is IBattleChara chara))
+            target ??= CurrentTarget;
+            if ((target is not IBattleChara chara)) return false;
+
+            try
             {
-                foreach (Status status in chara.StatusList)
-                {
-                    if (ActionWatching.StatusSheet.TryGetValue(status.StatusId, out var statusItem) && statusItem.CanDispel)
+                if (chara.StatusList.Length == 0) return false;
+
+                foreach (var status in chara.StatusList)
+                    if (ActionWatching.StatusSheet.TryGetValue(status.StatusId,
+                            out var statusItem) && statusItem.CanDispel)
                         return true;
-                }
             }
+            catch (AccessViolationException) // Accessing invalid status lists
+            {
+                return false;
+            }
+
             return false;
         }
 

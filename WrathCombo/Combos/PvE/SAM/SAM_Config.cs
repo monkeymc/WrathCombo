@@ -41,7 +41,7 @@ internal partial class SAM
             {
                 case CustomComboPreset.SAM_ST_Opener:
                     UserConfig.DrawBossOnlyChoice(SAM_Balance_Content);
-                    UserConfig.DrawSliderInt(0, 13, SAM_Opener_PrePullDelay, $"Delay from first {MeikyoShisui.ActionName()} to next step. (seconds)");
+                    UserConfig.DrawSliderInt(0, 13, SAM_Opener_PrePullDelay, $"Delay from first {MeikyoShisui.ActionName()} to next step. (seconds)\nDelay is enforced by replacing your button with Savage Blade.");
                     break;
 
                 case CustomComboPreset.SAM_ST_CDs_Iaijutsu:

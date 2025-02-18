@@ -50,7 +50,7 @@ public sealed partial class WrathCombo : IDalamudPlugin
 
     private readonly TextPayload starterMotd = new("[Wrath Message of the Day] ");
     private static uint? jobID;
-    private static bool inInstancedContent = false;
+    private static bool inInstancedContent;
 
     public static readonly List<uint> DisabledJobsPVE =
     [
@@ -85,17 +85,16 @@ public sealed partial class WrathCombo : IDalamudPlugin
     public static uint? JobID
     {
         get => jobID;
-        set
+        private set
         {
             if (jobID != value && value != null)
-            {
-                UpdateCaches(true, false);
-            }
+                UpdateCaches(jobID != null, false, jobID == null);
             jobID = value;
         }
     }
 
-    private static void UpdateCaches(bool onJobChange, bool onTerritoryChange)
+    private static void UpdateCaches
+        (bool onJobChange, bool onTerritoryChange, bool firstRun)
     {
         TM.DelayNext(1000);
         TM.Enqueue(() =>
@@ -105,9 +104,10 @@ public sealed partial class WrathCombo : IDalamudPlugin
 
             AST.QuickTargetCards.SelectedRandomMember = null;
             if (onJobChange)
-            {
                 PvEFeatures.OpenToCurrentJob(true);
-                Service.IconReplacer.UpdateFilteredCombos();
+            if (onJobChange || firstRun)
+            {
+                Service.ActionReplacer.UpdateFilteredCombos();
                 WrathOpener.SelectOpener();
                 P.IPCSearch.UpdateActiveJobPresets();
             }
@@ -148,7 +148,7 @@ public sealed partial class WrathCombo : IDalamudPlugin
         PresetStorage.Init();
 
         Service.ComboCache = new CustomComboCache();
-        Service.IconReplacer = new IconReplacer();
+        Service.ActionReplacer = new ActionReplacer();
         ActionWatching.Enable();
         AST.InitCheckCards();
         IPC = Provider.InitAsync().Result;
@@ -226,7 +226,7 @@ public sealed partial class WrathCombo : IDalamudPlugin
 
     private void ClientState_TerritoryChanged(ushort obj)
     {
-        UpdateCaches(false, true);
+        UpdateCaches(false, true, false);
     }
 
     public const string OptionControlledByIPC =
@@ -243,13 +243,9 @@ public sealed partial class WrathCombo : IDalamudPlugin
             if (conflictingCombos != null)
             {
                 foreach (var conflict in conflictingCombos.ConflictingPresets)
-                {
                     if (PresetStorage.IsEnabled(conflict))
-                    {
-                        Service.Configuration.EnabledActions.Remove(conflict);
-                        Service.Configuration.Save();
-                    }
-                }
+                        if (Service.Configuration.EnabledActions.Remove(conflict))
+                            Service.Configuration.Save();
             }
         }
     }
@@ -382,7 +378,7 @@ public sealed partial class WrathCombo : IDalamudPlugin
         Svc.PluginInterface.UiBuilder.OpenConfigUi -= OnOpenConfigUi;
         Svc.PluginInterface.UiBuilder.Draw -= DrawUI;
 
-        Service.IconReplacer.Dispose();
+        Service.ActionReplacer.Dispose();
         Service.ComboCache.Dispose();
         ActionWatching.Dispose();
         AST.DisposeCheckCards();

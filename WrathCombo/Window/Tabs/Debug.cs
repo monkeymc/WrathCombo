@@ -650,7 +650,7 @@ namespace WrathCombo.Window.Tabs
                         CustomStyleText($"Plugin Installed & On:", $"{OrbwalkerIPC.IsEnabled}");
                         if (OrbwalkerIPC.IsEnabled)
                         {
-                            CustomStyleText($"Version:", $"{OrbwalkerIPC.Version}");
+                            CustomStyleText($"Version:", $"{OrbwalkerIPC.InstalledVersion}");
                             CustomStyleText($"Plugin Enabled:", OrbwalkerIPC.PluginEnabled());
 
                             if (ImGui.Button($"Set Enabled"))

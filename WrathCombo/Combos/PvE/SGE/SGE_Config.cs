@@ -186,7 +186,7 @@ internal static partial class SGE
                     break;
 
                 case CustomComboPreset.SGE_AoE_Heal_Kerachole:
-                    DrawPriorityInput(SGE_AoE_Heals_Priority, 8, 0, $"{Kerachole.ActionName()} Priority: ");
+                    DrawPriorityInput(SGE_AoE_Heals_Priority, 9, 0, $"{Kerachole.ActionName()} Priority: ");
                     DrawSliderInt(0, 100, SGE_AoE_Heal_KeracholeOption, "Start using when below party average HP %. Set to 100 to disable this check");
                     DrawAdditionalBoolChoice(SGE_AoE_Heal_KeracholeTrait,
                                             "Check for Enhanced Kerachole Trait (Heal over Time)",

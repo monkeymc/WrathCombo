@@ -25,7 +25,7 @@ public enum CustomComboPreset
 
     [Role(JobRole.Tank)]
     [CustomComboInfo("Global Tank Features",
-        "Features and options involving shared role actions for Tanks.\nCollapsing this category does NOT disable the features inside.",
+        "Features and options involving shared role actions for Tanks.",
         ADV.JobID)]
     ALL_Tank_Menu = 100099,
 
@@ -41,7 +41,7 @@ public enum CustomComboPreset
     [ReplaceSkill(All.Reprisal)]
     [ParentCombo(ALL_Tank_Menu)]
     [CustomComboInfo("Tank: Double Reprisal Protection",
-        "Prevents the use of Reprisal when target already has the effect by replacing it with Stone.", ADV.JobID)]
+        "Prevents the use of Reprisal when target already has the effect by replacing it with Savage Blade.", ADV.JobID)]
     ALL_Tank_Reprisal = 100001,
 
     #endregion
@@ -50,7 +50,7 @@ public enum CustomComboPreset
 
     [Role(JobRole.Healer)]
     [CustomComboInfo("Global Healer Features",
-        "Features and options involving shared role actions for Healers.\nCollapsing this category does NOT disable the features inside.",
+        "Features and options involving shared role actions for Healers.",
         ADV.JobID)]
     ALL_Healer_Menu = 100098,
 
@@ -67,7 +67,7 @@ public enum CustomComboPreset
 
     [Role(JobRole.MagicalDPS)]
     [CustomComboInfo("Global Magical Ranged Features",
-        "Features and options involving shared role actions for Magical Ranged DPS.\nCollapsing this category does NOT disable the features inside.",
+        "Features and options involving shared role actions for Magical Ranged DPS.",
         ADV.JobID)]
     ALL_Caster_Menu = 100097,
 
@@ -75,7 +75,7 @@ public enum CustomComboPreset
     [ReplaceSkill(All.Addle)]
     [ParentCombo(ALL_Caster_Menu)]
     [CustomComboInfo("Magical Ranged DPS: Double Addle Protection",
-        "Prevents the use of Addle when target already has the effect by replacing it with Fell Cleave.", ADV.JobID)]
+        "Prevents the use of Addle when target already has the effect by replacing it with Savage Blade.", ADV.JobID)]
     ALL_Caster_Addle = 100020,
 
     [Role(JobRole.MagicalDPS)]
@@ -93,7 +93,7 @@ public enum CustomComboPreset
 
     [Role(JobRole.MeleeDPS)]
     [CustomComboInfo("Global Melee DPS Features",
-        "Features and options involving shared role actions for Melee DPS.\nCollapsing this category does NOT disable the features inside.",
+        "Features and options involving shared role actions for Melee DPS.",
         ADV.JobID)]
     ALL_Melee_Menu = 100096,
 
@@ -101,14 +101,14 @@ public enum CustomComboPreset
     [ReplaceSkill(All.Feint)]
     [ParentCombo(ALL_Melee_Menu)]
     [CustomComboInfo("Melee DPS: Double Feint Protection",
-        "Prevents the use of Feint when target already has the effect by replacing it with Fire.", ADV.JobID)]
+        "Prevents the use of Feint when target already has the effect by replacing it with Savage Blade.", ADV.JobID)]
     ALL_Melee_Feint = 100030,
 
     [Role(JobRole.MeleeDPS)]
     [ReplaceSkill(All.TrueNorth)]
     [ParentCombo(ALL_Melee_Menu)]
     [CustomComboInfo("Melee DPS: True North Protection",
-        "Prevents the use of True North when its buff is already active by replacing it with Fire.", ADV.JobID)]
+        "Prevents the use of True North when its buff is already active by replacing it with Savage Blade.", ADV.JobID)]
     ALL_Melee_TrueNorth = 100031,
 
     #endregion
@@ -117,7 +117,7 @@ public enum CustomComboPreset
 
     [Role(JobRole.RangedDPS)]
     [CustomComboInfo("Global Physical Ranged Features",
-        "Features and options involving shared role actions for Physical Ranged DPS.\nCollapsing this category does NOT disable the features inside.",
+        "Features and options involving shared role actions for Physical Ranged DPS.",
         ADV.JobID)]
     ALL_Ranged_Menu = 100095,
 
@@ -125,7 +125,7 @@ public enum CustomComboPreset
     [ReplaceSkill(MCH.Tactician, BRD.Troubadour, DNC.ShieldSamba)]
     [ParentCombo(ALL_Ranged_Menu)]
     [CustomComboInfo("Physical Ranged DPS: Double Mitigation Protection",
-        "Prevents the use of Tactician/Troubadour/Shield Samba when target already has one of those three effects.",
+        "Prevents the use of Tactician/Troubadour/Shield Samba when target already has one of those three effects by replacing them with Savage Blade.",
         ADV.JobID)]
     ALL_Ranged_Mitigation = 100040,
 
@@ -518,7 +518,7 @@ public enum CustomComboPreset
 
     [ReplaceSkill(BLM.Triplecast)]
     [CustomComboInfo("Triplecast Protection",
-        "Replaces Triplecast with Savage Blade when u already have triplecast active.", BLM.JobID)]
+        "Replaces Triplecast with Savage Blade when you already have triplecast active.", BLM.JobID)]
     BLM_TriplecastProtection = 2056,
 
     [ReplaceSkill(BLM.Fire)]
@@ -1038,6 +1038,20 @@ public enum CustomComboPreset
     DNC_ST_Adv_Flourish = 4020,
 
     [ParentCombo(DNC_ST_AdvancedMode)]
+    [CustomComboInfo("Fan Dance Procc Options",
+        "Options for including Fan Dance 3 and 4 into the rotation." +
+        "\nNote: If using the Forced Triple Weave option, FD3&4 will be used regardless of these options.", DNC.JobID)]
+    DNC_ST_Adv_FanProccs = 4028,
+
+    [ParentCombo(DNC_ST_Adv_FanProccs)]
+    [CustomComboInfo("Fan Dance 3", "Includes Fan Dance 3 when under Threefold Fan Dance.", DNC.JobID)]
+    DNC_ST_Adv_FanProcc3 = 4029,
+
+    [ParentCombo(DNC_ST_Adv_FanProccs)]
+    [CustomComboInfo("Fan Dance 4", "Includes Fan Dance 4 when under Fourfold Fan Dance.", DNC.JobID)]
+    DNC_ST_Adv_FanProcc4 = 4030,
+
+    [ParentCombo(DNC_ST_AdvancedMode)]
     [CustomComboInfo("Feathers Option",
         "Expends a feather in the next available weave window when capped and under the effect of Flourishing Symmetry or Flourishing Flow." +
         "\nWeaves feathers where possible during Technical Finish." +
@@ -1078,7 +1092,7 @@ public enum CustomComboPreset
     DNC_ST_Adv_PanicHeals = 4027,
 
     #endregion
-    // Last value = 4027
+    // Last value = 4030
 
     #region Advanced Dancer (AoE)
 
@@ -1124,6 +1138,18 @@ public enum CustomComboPreset
     DNC_AoE_Adv_Flourish = 4047,
 
     [ParentCombo(DNC_AoE_AdvancedMode)]
+    [CustomComboInfo("Fan Dance Procc Options", "Options for including Fan Dance 3 and 4 into the rotation.", DNC.JobID)]
+    DNC_AoE_Adv_FanProccs = 4055,
+
+    [ParentCombo(DNC_AoE_Adv_FanProccs)]
+    [CustomComboInfo("Fan Dance 3", "Includes Fan Dance 3 when under Threefold Fan Dance.", DNC.JobID)]
+    DNC_AoE_Adv_FanProcc3 = 4056,
+
+    [ParentCombo(DNC_AoE_Adv_FanProccs)]
+    [CustomComboInfo("Fan Dance 4", "Includes Fan Dance 4 when under Fourfold Fan Dance.", DNC.JobID)]
+    DNC_AoE_Adv_FanProcc4 = 4057,
+
+    [ParentCombo(DNC_AoE_AdvancedMode)]
     [CustomComboInfo("Feathers Option",
         "Expends a feather in the next available weave window when capped and under the effect of Flourishing Symmetry or Flourishing Flow." +
         "\nWeaves feathers where possible during Technical Finish." +
@@ -1163,7 +1189,7 @@ public enum CustomComboPreset
     DNC_AoE_Adv_PanicHeals = 4054,
 
     #endregion
-    // Last value = 4054
+    // Last value = 4057
 
     #region Multibutton Features
 
@@ -1232,6 +1258,7 @@ public enum CustomComboPreset
         "\nLets you still dance with combos on, without using Dance Step Combo Feature.", DNC.JobID)]
     DNC_CustomDanceSteps = 4115,
 
+    [ParentCombo(DNC_CustomDanceSteps)]
     [ReplaceSkill(DNC.Devilment)]
     [CustomComboInfo("Override Smaller Features", "If enabled, will let you choose actions that are replaced by the smaller features listed below here, and they will return the Step that you have set them to when dancing.", DNC.JobID)]
     DNC_CustomDanceSteps_Conflicts = 4116,
@@ -1590,7 +1617,7 @@ public enum CustomComboPreset
     #endregion
 
     [ParentCombo(DRK_AoE_CDs)]
-    [CustomComboInfo("Abyssal Drain Option", "Adds Abyssal Drain to the rotation when you fall below 60 percent hp.",
+    [CustomComboInfo("Abyssal Drain Option", "Adds Abyssal Drain to the rotation when you fall below the chosen HP.",
         DRK.JobID)]
     DRK_AoE_CD_Drain = 5060,
 
@@ -1725,16 +1752,32 @@ public enum CustomComboPreset
     #region oGCD Feature
 
     [ReplaceSkill(DRK.CarveAndSpit, DRK.AbyssalDrain)]
-    [CustomComboInfo("oGCD Feature", "Adds Living Shadow > Disesteem > Salted Earth > Salt And Darkness to Carve And Spit and Abyssal Drain.", DRK.JobID)]
+    [CustomComboInfo("oGCD Feature", "Adds selected oGCD abilities to Carve And Spit and Abyssal Drain.", DRK.JobID)]
     DRK_oGCD = 5120,
 
     [ParentCombo(DRK_oGCD)]
-    [CustomComboInfo("Interrupt Option", "Adds Interject to the beginning of the feature when your target's cast is interruptible.", DRK.JobID)]
+    [CustomComboInfo("Interrupt Option", "Adds Interject to the feature when your target's cast is interruptible.", DRK.JobID)]
     DRK_oGCD_Interrupt = 5121,
 
     [ParentCombo(DRK_oGCD)]
-    [CustomComboInfo("Delirium Option", "Adds Blood Weapon or Delirium to the Feature.", DRK.JobID)]
+    [CustomComboInfo("Delirium Option", "Adds Delirium (or Blood Weapon) to the Feature.", DRK.JobID)]
     DRK_oGCD_Delirium = 5122,
+
+    [ParentCombo(DRK_oGCD)]
+    [CustomComboInfo("Living Shadow Option", "Adds Living Shadow to the Feature.", DRK.JobID)]
+    DRK_oGCD_Shadow = 5124,
+
+    [ParentCombo(DRK_oGCD)]
+    [CustomComboInfo("Disesteem Option", "Adds Disesteem to the Feature.", DRK.JobID)]
+    DRK_oGCD_Disesteem = 5125,
+
+    [ParentCombo(DRK_oGCD)]
+    [CustomComboInfo("Salted Earth Option", "Adds Salted Earth to the Feature.", DRK.JobID)]
+    DRK_oGCD_SaltedEarth = 5126,
+
+    [ParentCombo(DRK_oGCD)]
+    [CustomComboInfo("Salt and Darkness Option", "Adds Saltand Darkness to the Feature when under the effect of Salted Earth.", DRK.JobID)]
+    DRK_oGCD_SaltAndDarkness = 5127,
 
     [ParentCombo(DRK_oGCD)]
     [CustomComboInfo("Shadowbringer Option", "Adds Shadowbringer to the Feature.", DRK.JobID)]
@@ -1837,7 +1880,7 @@ public enum CustomComboPreset
         "Adds (High) Jump to the rotation when in the target ring (1 yalm) & when not moving.", DRG.JobID)]
     DRG_ST_HighJump_Melee = 6114,
 
-    [ParentCombo(DRG_ST_HighJump)]
+    [ParentCombo(DRG_ST_CDs)]
     [CustomComboInfo("Mirage Dive Option", "Adds Mirage Dive to the rotation.", DRG.JobID)]
     DRG_ST_Mirage = 6115,
 
@@ -1940,7 +1983,7 @@ public enum CustomComboPreset
         "Adds (High) Jump to the rotation when in the target ring (1 yalm) & when not moving.", DRG.JobID)]
     DRG_AoE_HighJump_Melee = 6214,
 
-    [ParentCombo(DRG_AoE_HighJump)]
+    [ParentCombo(DRG_AoE_CDs)]
     [CustomComboInfo("Mirage Dive Option", "Adds Mirage Dive to the rotation.", DRG.JobID)]
     DRG_AoE_Mirage = 6215,
 
@@ -2163,7 +2206,7 @@ public enum CustomComboPreset
     GNB_ST_Superbolide = 7022,
 
     [ParentCombo(GNB_ST_Mitigation)]
-    [CustomComboInfo("Aurora Protection Feature", "Locks out Aurora if Aurora's effect is on the target.", GNB.JobID)]
+    [CustomComboInfo("Aurora Protection Feature", "Locks out Aurora if Aurora's effect is on the target by replacing it with Savage Blade.", GNB.JobID)]
     GNB_AuroraProtection = 7023,
 
     [ParentCombo(GNB_ST_Mitigation)]
@@ -2664,7 +2707,7 @@ public enum CustomComboPreset
     [AutoAction(true, false)]
     [ReplaceSkill(MCH.SpreadShot, MCH.Scattergun)]
     [ConflictingCombos(MCH_AoE_AdvancedMode)]
-    [CustomComboInfo("Simple Mode - AoE", "Replaces Spreadshot with a full one-button AoE rotation.\nThis is the ideal option for newcomers to the job.", MCH.JobID)]
+    [CustomComboInfo("Simple Mode - AoE", "Replaces Spreadshot with a full one-button AoE rotation.\nThis is the ideal option for newcomers to the job.\nWill lock out input to keep Flamethrower going by replacing Spreadshot with Savage Blade.", MCH.JobID)]
     MCH_AoE_SimpleMode = 8200,
 
     #endregion
@@ -2748,7 +2791,7 @@ public enum CustomComboPreset
     [AutoAction(true, false)]
     [ReplaceSkill(MCH.SpreadShot, MCH.Scattergun)]
     [ConflictingCombos(MCH_AoE_SimpleMode)]
-    [CustomComboInfo("Advanced Mode - AoE", "Replaces Spreadshot with a full one-button AoE rotation.\nThese features are ideal if you want to customize the rotation.", MCH.JobID)]
+    [CustomComboInfo("Advanced Mode - AoE", "Replaces Spreadshot with a full one-button AoE rotation.\nThese features are ideal if you want to customize the rotation.\nWill lock out input to keep Flamethrower going by replacing Spreadshot with Savage Blade.", MCH.JobID)]
     MCH_AoE_AdvancedMode = 8300,
 
     [ParentCombo(MCH_AoE_AdvancedMode)]
@@ -2824,7 +2867,7 @@ public enum CustomComboPreset
     #endregion
 
     [ReplaceSkill(MCH.Dismantle)]
-    [CustomComboInfo("Physical Ranged DPS: Double Dismantle Protection", "Prevents the use of Dismantle when target already has the effect.", MCH.JobID)]
+    [CustomComboInfo("Physical Ranged DPS: Double Dismantle Protection", "Prevents the use of Dismantle when target already has the effect by replacing it with Savage Blade.", MCH.JobID)]
     All_PRanged_Dismantle = 8042,
 
     [ReplaceSkill(MCH.Dismantle)]
@@ -4482,13 +4525,13 @@ public enum CustomComboPreset
     RDM_MagickBarrierAddle = 13821,
 
     [ReplaceSkill(RDM.Embolden)]
-    [CustomComboInfo("Embolden Overlap Protection", "Disables Embolden when buffed by another Red Mage's Embolden.",
+    [CustomComboInfo("Embolden Overlap Protection", "Disables Embolden when buffed by another Red Mage's Embolden by replacing it with Savage Blade.",
         RDM.JobID)]
     RDM_EmboldenProtection = 13835,
 
     [ReplaceSkill(RDM.MagickBarrier)]
     [CustomComboInfo("Magick Barrier Overlap Protection",
-        "Disables Magick Barrier when buffed by another Red Mage's Magick Barrier.", RDM.JobID)]
+        "Disables Magick Barrier when buffed by another Red Mage's Magick Barrier by replacing it with Savage Blade.", RDM.JobID)]
     RDM_MagickProtection = 13836,
 
     [Variant]
@@ -5015,7 +5058,7 @@ public enum CustomComboPreset
     [ReplaceSkill(SAM.MeikyoShisui)]
     [ConflictingCombos(SAM_MeikyoSens)]
     [CustomComboInfo("Meikyo Shisui Protection",
-        "Replaces Meikyo Shisui with Savage Blade when u already have Meikyo Shisui active.", SAM.JobID)]
+        "Replaces Meikyo Shisui with Savage Blade when you already have Meikyo Shisui active.", SAM.JobID)]
     SAM_MeikyoShisuiProtection = 15214,
 
     #endregion
@@ -6517,7 +6560,7 @@ public enum CustomComboPreset
     [Role(JobRole.All)]
     [PvPCustomCombo]
     [CustomComboInfo("Prevent Mash Cancelling Feature",
-        "Stops you cancelling your guard if you're pressing buttons quickly.", ADV.JobID)]
+        "Stops you cancelling your guard if you're pressing buttons quickly by replacing your buttons with Savage Blade.", ADV.JobID)]
     PvP_MashCancel = 1100030,
 
     [Role(JobRole.All)]
@@ -6535,6 +6578,7 @@ public enum CustomComboPreset
     #region ASTROLOGIAN
 
     [PvPCustomCombo]
+    [ReplaceSkill(ASTPvP.Malefic)]
     [CustomComboInfo("Burst Mode", "Turns Fall Malefic into an all-in-one damage button.", AST.JobID)]
     ASTPvP_Burst = 111000,
 
@@ -6547,6 +6591,7 @@ public enum CustomComboPreset
     ASTPvP_Burst_PlayCard = 111003,
 
     [PvPCustomCombo]
+    [ReplaceSkill(ASTPvP.AspectedBenefic)]
     [CustomComboInfo("Double Cast Heal Feature", "Adds Double Cast to Aspected Benefic.", AST.JobID)]
     ASTPvP_Heal = 111004,
 
@@ -6569,6 +6614,7 @@ public enum CustomComboPreset
     ASTPvP_Burst_Macrocosmos = 111007,
 
     [PvPCustomCombo]
+    [ReplaceSkill(ASTPvP.Epicycle)]
     [CustomComboInfo("Epicycle Burst Feature", "Turns Epicycle into burst combo.", AST.JobID)]
     ASTPvP_Epicycle = 111008,
 
@@ -6620,6 +6666,7 @@ public enum CustomComboPreset
     #region BARD
 
     [PvPCustomCombo]
+    [ReplaceSkill(BRDPvP.PowerfulShot)]
     [CustomComboInfo("Burst Mode", "Turns Powerful Shot into an all-in-one damage button.", BRDPvP.JobID)]
     BRDPvP_BurstMode = 113000,
 
@@ -6663,6 +6710,7 @@ public enum CustomComboPreset
     #region DANCER
 
     [PvPCustomCombo]
+    [ReplaceSkill(DNCPvP.Fountain)]
     [CustomComboInfo("Burst Mode", "Turns Fountain Combo into an all-in-one damage button.", DNC.JobID)]
     DNCPvP_BurstMode = 114000,
 
@@ -6697,6 +6745,7 @@ public enum CustomComboPreset
     #region DARK KNIGHT
 
     [PvPCustomCombo]
+    [ReplaceSkill(DRKPvP.Souleater)]
     [CustomComboInfo("Burst Mode", "Turns Souleater Combo into an all-in-one damage button.", DRK.JobID)]
     DRKPvP_Burst = 115000,
 
@@ -6748,6 +6797,7 @@ public enum CustomComboPreset
     #region DRAGOON
 
     [PvPCustomCombo]
+    [ReplaceSkill(DRGPvP.Drakesbane)]
     [CustomComboInfo("Burst Mode", "Turns Drakesbane Combo into an all-in-one damage button.", DRG.JobID)]
     DRGPvP_Burst = 116000,
 
@@ -6796,6 +6846,7 @@ public enum CustomComboPreset
     #region Burst Mode
 
     [PvPCustomCombo]
+    [ReplaceSkill(GNBPvP.SolidBarrel)]
     [CustomComboInfo("Burst Mode", "Turns Solid Barrel Combo into an all-in-one damage button.", GNB.JobID)]
     GNBPvP_Burst = 117000,
 
@@ -6831,8 +6882,8 @@ public enum CustomComboPreset
 
     #region Option Select
 
-    [ConflictingCombos(GNBPvP_ST_GnashingFang)]
     [PvPCustomCombo]
+    [ReplaceSkill(GNBPvP.GnashingFang)]
     [CustomComboInfo("Continuation Feature", "Adds Continuation to Gnashing Fang.", GNB.JobID)]
     GNBPvP_GnashingFang = 117010,
 
@@ -6845,6 +6896,7 @@ public enum CustomComboPreset
     #region MACHINIST
 
     [PvPCustomCombo]
+    [ReplaceSkill(MCHPvP.BlastCharge)]
     [CustomComboInfo("Burst Mode", "Turns Blast Charge into an all-in-one damage button.", MCHPvP.JobID)]
     MCHPvP_BurstMode = 118000,
 
@@ -6906,6 +6958,7 @@ public enum CustomComboPreset
     #region MONK
 
     [PvPCustomCombo]
+    [ReplaceSkill(MNKPvP.PhantomRush)]
     [CustomComboInfo("Burst Mode", "Turns Phantom Rush Combo into an all-in-one damage button.", MNK.JobID)]
     MNKPvP_Burst = 119000,
 
@@ -6949,10 +7002,12 @@ public enum CustomComboPreset
     #region NINJA
 
     [PvPCustomCombo]
+    [ReplaceSkill(NINPvP.AeolianEdge)]
     [CustomComboInfo("Burst Mode", "Turns Aeolian Edge Combo into an all-in-one damage button.", NINPvP.JobID)]
     NINPvP_ST_BurstMode = 120000,
 
     [PvPCustomCombo]
+    [ReplaceSkill(NINPvP.FumaShuriken)]
     [CustomComboInfo("AoE Burst Mode", "Turns Fuma Shuriken into an all-in-one AoE damage button.", NINPvP.JobID)]
     NINPvP_AoE_BurstMode = 120001,
 
@@ -7048,6 +7103,7 @@ public enum CustomComboPreset
     #region PALADIN
 
     [PvPCustomCombo]
+    [ReplaceSkill(PLDPvP.RoyalAuthority)]
     [CustomComboInfo("Burst Mode", "Turns Royal Authority Combo into an all-in-one damage button.", PLD.JobID)]
     PLDPvP_Burst = 121000,
 
@@ -7136,6 +7192,7 @@ public enum CustomComboPreset
     #region REAPER
 
     [PvPCustomCombo]
+    [ReplaceSkill(RPRPvP.Slice)]
     [CustomComboInfo("Burst Mode",
         "Turns Slice Combo into an all-in-one damage button.\nAdds Soul Slice to the main combo.", RPR.JobID)]
     RPRPvP_Burst = 122000,
@@ -7203,7 +7260,7 @@ public enum CustomComboPreset
 
     [PvPCustomCombo]
     [ReplaceSkill(RDMPvP.Jolt3)]
-    [CustomComboInfo("Burst Mode", "Turns Jolt III into an all-in-one button.\n- Will not attempt to cast Jolt III while moving.", RDMPvP.JobID)]
+    [CustomComboInfo("Burst Mode", "Turns Jolt III into an all-in-one button.\n- Will not attempt to cast Jolt III while moving by replacing it with Savage Blade.", RDMPvP.JobID)]
     RDMPvP_BurstMode = 123000,
 
     [PvPCustomCombo]
@@ -7248,6 +7305,7 @@ public enum CustomComboPreset
     #region SAGE
 
     [PvPCustomCombo]
+    [ReplaceSkill(SGEPvP.Dosis)]
     [CustomComboInfo("Burst Mode", "Turns Dosis III into an all-in-one damage button.", SGE.JobID)]
     SGEPvP_BurstMode = 124000,
 
@@ -7333,6 +7391,7 @@ public enum CustomComboPreset
     #region SCHOLAR
 
     [PvPCustomCombo]
+    [ReplaceSkill(SCHPvP.Broil)]
     [CustomComboInfo("Burst Mode", "Turns Broil IV into all-in-one damage button.", SCH.JobID)]
     SCHPvP_Burst = 126000,
 
@@ -7359,6 +7418,7 @@ public enum CustomComboPreset
     #region SUMMONER
 
     [PvPCustomCombo]
+    [ReplaceSkill(SMNPvP.Ruin3)]
     [CustomComboInfo("Burst Mode",
         "Turns Ruin III into an all-in-one damage button.\nOnly uses Crimson Cyclone when in melee range.",
         SMNPvP.JobID)]
@@ -7459,6 +7519,7 @@ public enum CustomComboPreset
     #region WARRIOR
 
     [PvPCustomCombo]
+    [ReplaceSkill(WARPvP.HeavySwing)]
     [CustomComboInfo("Burst Mode", "Turns Heavy Swing into an all-in-one damage button.", WARPvP.JobID)]
     WARPvP_BurstMode = 128000,
 

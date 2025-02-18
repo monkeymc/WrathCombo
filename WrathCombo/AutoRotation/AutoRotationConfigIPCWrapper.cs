@@ -208,6 +208,8 @@ public class HealerSettingsIPCWrapper(HealerSettings settings)
 
     #region Direct Pass-Throughs (no IPC check)
 
+    public bool AutoRezRequireSwift => settings.AutoRezRequireSwift;
+
     public int? AoEHealTargetCount => settings.AoEHealTargetCount;
 
     public int HealDelay => settings.HealDelay;

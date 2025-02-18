@@ -7,6 +7,7 @@ using ECommons.DalamudServices;
 using ImGuiNET;
 using System;
 using System.Numerics;
+using System.Text.Json;
 using WrathCombo.Combos;
 using WrathCombo.Combos.PvP;
 using WrathCombo.Core;
@@ -120,9 +121,24 @@ namespace WrathCombo.Window.Functions
             };
 
             box.Draw();
+            DrawResetContextMenu(config);
             ImGui.Spacing();
             ImGui.Unindent();
             return box.FuncRes;
+        }
+
+        private static void DrawResetContextMenu(string config)
+        {
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                ImGui.OpenPopup($"##ResetConfig{config}");
+
+            using var contextMenu = ImRaii.Popup($"##ResetConfig{config}");
+            if (!contextMenu) return;
+
+            if (ImGui.MenuItem("Reset to Default"))
+            {
+                ResetToDefault(config);
+            }
         }
 
         /// <summary> Draws a slider that lets the user set a given value for their feature. </summary>
@@ -216,6 +232,7 @@ namespace WrathCombo.Window.Functions
             };
 
             box.Draw();
+            DrawResetContextMenu(config);
             ImGui.Spacing();
         }
 
@@ -311,6 +328,7 @@ namespace WrathCombo.Window.Functions
             };
 
             box.Draw();
+            DrawResetContextMenu(config);
             ImGui.Spacing();
         }
 
@@ -1506,6 +1524,11 @@ namespace WrathCombo.Window.Functions
         {
             double sliderAsDouble = Convert.ToDouble(sliderIncrement);
             return ((int)Math.Round(i / sliderAsDouble)) * (int)sliderIncrement;
+        }
+
+        private static void ResetToDefault(string config)
+        {
+            UserData.MasterList[config].ResetToDefault();
         }
     }
 

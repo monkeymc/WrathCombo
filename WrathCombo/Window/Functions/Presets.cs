@@ -376,10 +376,10 @@ namespace WrathCombo.Window.Functions
                                 continue;
                             }
 
-                            if (conflictOriginals.Any(x => PresetStorage.IsEnabled(x)))
+                            if (conflictOriginals.Any(PresetStorage.IsEnabled))
                             {
-                                Service.Configuration.EnabledActions.Remove(childPreset);
-                                Service.Configuration.Save();
+                                if (Service.Configuration.EnabledActions.Remove(childPreset))
+                                    Service.Configuration.Save();
 
                                 // Keep removed items in the counter
                                 currentPreset += 1 + AllChildren(presetChildren[childPreset]);

@@ -145,6 +145,10 @@ the [Discord](https://discord.gg/Zzrcc8kmvy) server for more info.
 
 ## Use with Other Plugins
 
+By default, the plugins below will ensure that combos in Wrath are set up, and
+will lock all settings under those combos to `On` if combos were not set up, to
+ensure that the rotation will run.
+
 ### [AutoDuty](https://github.com/ffxivcode/AutoDuty)
 
 Wrath Combo can be used as the Rotation Engine for AutoDuty, such that Wrath Combo's
@@ -152,13 +156,19 @@ Auto-Rotation will be used during duties.
 To enable this:
 1. Open AutoDuty's main window.
 2. Go to the "Config" tab.
-3. Expand the "Duty Config" section.
+3. Expand the "Duty Config Settings" section.
 4. Enable "Auto Manage Rotation Plugin State".
-5. (Also check "> Wrath Config Options <" -> "Auto setup jobs for autorotation")
+5. (Also check "> Wrath Config Options <" -> "Auto setup jobs for autorotation")\
+   (if you already have your jobs setup, you can skip this step)
 
-By default, AutoDuty will ensure that combos in Wrath are set up, and will lock all
-settings under those combos to `On` if combos were not set up, to ensure that the 
-rotation will run; if you already have your jobs setup, you can disable Option 5 above.
+### [Questionable](https://git.carvel.li/liza/Questionable)
+
+Wrath Combo can be used as the Combat Module for Questionable, such that Wrath 
+Combo's Auto-Rotation will be employed during questing.
+To enable this:
+1. Open Questionable's Settings window.
+2. Go to the "General" tab.
+3. Select "Wrath Combo" as the "Preferred Combat Module".
 
   <p align="right"><a href="#top" alt="Back to top"><img src=/res/readme_images/arrowhead-up.png width ="25"/></a></p>
 </section> 
@@ -171,6 +181,8 @@ rotation will run; if you already have your jobs setup, you can disable Option 5
 | **Chat command**                       | **Function**                                                                                                                                                                   |
 |:---------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `/wrath`                               | Opens the main plugin window, where you can enable/disable features, access settings and more.                                                                                 |
+| `/wrath settings`                      | Opens the main plugin window, to the Settings tab.                                                                                                                             |
+| `/wrath autosettings`                  | Opens the main plugin window, to the Auto-Rotation tab.                                                                                                                        |
 | `/wrath <X>`                           | Opens the main plugin window, to a specific job's PvE features.<br>Replace `<X>` with the jobs abbreviation.                                                                   |
 | `/wrath auto`                          | Toggles Auto-Rotation **on** or **off**.                                                                                                                                       |
 | `/wrath auto <X>`                      | Sets Auto-Rotation to a specific state.<br>Replace `<X>` with `on`, `off`, or `toggle`.                                                                                        |

@@ -126,6 +126,14 @@ internal partial class DNC
                 #region Advanced Single Target UI
 
                 case CustomComboPreset.DNC_ST_BalanceOpener:
+                    ImGui.Indent();
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
+                    ImGui.TextWrapped(
+                        "Opener variations:     (hover each for more info)");
+                    ImGui.PopStyleColor();
+                    ImGui.Unindent();
+                    ImGui.NewLine();
+
                     UserConfig.DrawRadioButton(DNC_ST_OpenerSelection,
                         "Standard: 15s Countdown",
                         "Requires at least a 15s cooldown\nand that you start Standard Step at 15s.",
@@ -136,8 +144,12 @@ internal partial class DNC
                         (int)Openers.SevenSecond, descriptionAsTooltip: true);
                     UserConfig.DrawRadioButton(DNC_ST_OpenerSelection,
                         "Technical: 30s Countdown",
-                        "Requires at least a 30s cooldown\nand that you start Standard Step at 30s.\nNot generally recommended.\nWill align buffs worse than Standard 15s.",
+                        "Requires a 30s cooldown\nand that you start Standard Step at 30s.\nNot generally recommended.\nWill align buffs worse than Standard 15s.",
                         (int)Openers.ThirtySecondTech, descriptionAsTooltip: true);
+                    UserConfig.DrawRadioButton(DNC_ST_OpenerSelection,
+                        "Technical: 7+s Countdown",
+                        "Requires at least a 7s cooldown\nand that you complete Standard Step beforehand.\nDoes not include Peloton.\nWill NOT Standard Step for you.\nNot generally recommended.\nWill align buffs worse than Standard 7s.",
+                        (int)Openers.SevenPlusSecondTech, descriptionAsTooltip: true);
                     UserConfig.DrawRadioButton(DNC_ST_OpenerSelection,
                         "Technical: 7s Countdown",
                         "Requires at least a 7s cooldown\nand that you start Technical Step at 7s.\nNOT recommended.",
@@ -359,6 +371,7 @@ internal partial class DNC
             FifteenSecond,
             SevenSecond,
             ThirtySecondTech,
+            SevenPlusSecondTech,
             SevenSecondTech,
         }
 
