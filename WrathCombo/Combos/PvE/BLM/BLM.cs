@@ -126,8 +126,7 @@ internal partial class BLM : Caster
 
             if (FirePhase)
             {
-                // TODO: Revisit when Raid Buff checks are in place
-                if (HasPolyglotStacks())
+                if (HasPolyglotStacks() && IsBursting)
                     return ActionReady(Xenoglossy)
                         ? Xenoglossy
                         : Foul;
@@ -436,13 +435,13 @@ internal partial class BLM : Caster
 
             if (FirePhase)
             {
-                // TODO: Revisit when Raid Buff checks are in place
                 if (IsEnabled(Preset.BLM_ST_UsePolyglot) &&
-                    (BLM_ST_MovementOption[3] &&
-                     PolyglotStacks > BLM_ST_PolyglotMovement &&
-                     PolyglotStacks > BLM_ST_PolyglotSaveUsage ||
-                     !BLM_ST_MovementOption[3] &&
-                     PolyglotStacks > BLM_ST_PolyglotSaveUsage))
+                    ((IsBursting && HasPolyglotStacks()) ||
+                     (BLM_ST_MovementOption[3] &&
+                      PolyglotStacks > BLM_ST_PolyglotMovement &&
+                      PolyglotStacks > BLM_ST_PolyglotSaveUsage) ||
+                     (!BLM_ST_MovementOption[3] &&
+                      PolyglotStacks > BLM_ST_PolyglotSaveUsage)))
                     return LevelChecked(Xenoglossy)
                         ? Xenoglossy
                         : Foul;

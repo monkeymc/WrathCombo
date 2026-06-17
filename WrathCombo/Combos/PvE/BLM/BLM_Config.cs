@@ -114,6 +114,10 @@ internal partial class BLM
                     break;
 
                 case Preset.BLM_ST_UsePolyglot:
+                    DrawAdditionalBoolChoice(BLM_IsBurstingOverride,
+                        "Force Burst Phase Active (For Testing)",
+                        "Manually triggers the burst priority for testing rotations on a dummy without party buffs.");
+
                     if (DrawSliderInt(0, 3, BLM_ST_PolyglotSaveUsage,
                         Generics.ChargePool))
                         if (BLM_ST_PolyglotMovement > 3 - BLM_ST_PolyglotSaveUsage)
@@ -328,6 +332,7 @@ internal partial class BLM
             BLM_ST_ThunderRefresh = new("BLM_ST_ThunderUptime_Threshold", 2.5f);
 
         public static UserBool
+            BLM_IsBurstingOverride = new("BLM_IsBurstingOverride"),
             BLM_AM_FieldMouseover = new("BLM_AM_FieldMouseover"),
             BLM_AmplifierXenoCD = new("BLM_AmplifierXenoCD"),
             BLM_Fire4_FlareStar = new("BLM_Fire4_FlareStar"),

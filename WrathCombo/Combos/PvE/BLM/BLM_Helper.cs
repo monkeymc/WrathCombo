@@ -1,17 +1,31 @@
-﻿using Dalamud.Game.ClientState.JobGauge.Types;
+using Dalamud.Game.ClientState.JobGauge.Types;
 using Dalamud.Game.ClientState.Statuses;
 using ECommons.GameHelpers;
+using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
+using WrathCombo.AutoRotation;
 using WrathCombo.CustomComboNS;
 using WrathCombo.CustomComboNS.Functions;
 using static WrathCombo.Combos.PvE.BLM.Config;
 using static WrathCombo.CustomComboNS.Functions.CustomComboFunctions;
+using EZ = ECommons.Throttlers.EzThrottler;
+using TS = System.TimeSpan;
+
 namespace WrathCombo.Combos.PvE;
 
 internal partial class BLM
 {
+    #region Burst Phase
+
+    /// <summary>
+    /// Whether the BLM is in an even-minute Burst phase.
+    /// </summary>
+    internal static bool IsBursting => BLM.Config.BLM_IsBurstingOverride || Bursting.PartyIsBursting;
+
+    #endregion
+
     #region Misc
 
     private static int MaxPolyglot =>

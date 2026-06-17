@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using Dalamud.Plugin.Ipc;
 using ECommons.DalamudServices;
