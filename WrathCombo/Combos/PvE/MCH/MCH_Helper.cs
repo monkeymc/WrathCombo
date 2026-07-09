@@ -12,18 +12,61 @@ internal partial class MCH
 {
     #region Queen
 
+    // Queen potency scales linearly with Battery, so Queens belong at the
+    // Wildfire burst window at as high a Battery as possible. Summon on
+    // cooldown (Battery >= 90) only when Wildfire can't be used as the
+    // anchor; otherwise wait for Wildfire, and only break early to dump a
+    // sub-cap Queen when riding to Wildfire would overcap Battery anyway.
     private static bool ShouldUseQueenST()
     {
-        if (Battery is 100)
-            return true;
+        if (!LevelChecked(Wildfire) || CurrentTarget is null ||
+            !CanApplyStatus(CurrentTarget, Debuffs.Wildfire))
+            return Battery >= 90;
 
-        if (Battery > 80 &&
-            (HasStatusEffect(Buffs.ExcavatorReady) ||
-             ActionReady(Chainsaw) ||
-             ActionReady(OriginalHook(AirAnchor))))
-            return true;
+        if (GetCooldownRemainingTime(Wildfire) <= GCDTotal * 2)
+            return Battery >= 50;
 
-        return Battery > 90 && ComboAction == OriginalHook(SlugShot);
+        var forecast = BatteryForecastToWildfire();
+        return Battery >= 50 && forecast >= 50 && Battery + forecast > 100;
+    }
+
+    // Forecasts Battery generated between now and Wildfire coming off
+    // cooldown, so ShouldUseQueenST can tell whether holding the current
+    // Battery for the Wildfire window still leaves enough being generated
+    // for a second, well-timed Queen — versus needing to spend early.
+    private static int BatteryForecastToWildfire()
+    {
+        var t = GetCooldownRemainingTime(Wildfire);
+
+        // Air Anchor is spent before the burst (the Hypercharge tool hold
+        // requires it on cooldown), so every cast fitting in t counts.
+        var airAnchorCasts = 0;
+        if (LevelChecked(OriginalHook(AirAnchor)))
+            for (var next = GetCooldownRemainingTime(OriginalHook(AirAnchor)); next <= t; next += 40f)
+                airAnchorCasts++;
+
+        // Chain Saw (and the Excavator it grants) coming up just before
+        // Wildfire is held into the burst window instead, generating no
+        // Battery beforehand — only count casts landing clear of the hold.
+        var chainSawCasts = 0;
+        if (LevelChecked(Chainsaw))
+            for (var next = GetCooldownRemainingTime(Chainsaw); next <= t - 10f; next += 60f)
+                chainSawCasts++;
+
+        var excavatorCasts = 0;
+        if (LevelChecked(Excavator))
+        {
+            excavatorCasts = chainSawCasts;
+            if (HasStatusEffect(Buffs.ExcavatorReady))
+                excavatorCasts++;
+        }
+
+        var toolCasts = airAnchorCasts + chainSawCasts + excavatorCasts;
+        // Heated Clean Shot lands roughly once per 12s after tool, Drill,
+        // and overheat GCDs take their slots (measured from reference logs).
+        var cleanShotCasts = (int)(t / 12f);
+
+        return toolCasts * 20 + cleanShotCasts * 10;
     }
 
     private static bool CanQueen(
