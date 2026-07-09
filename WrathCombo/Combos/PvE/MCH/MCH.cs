@@ -236,8 +236,13 @@ internal partial class MCH : PhysicalRanged
             if (CanUseFullMetalField)
                 return FullMetalField;
 
+            // One tool fitted into the overheat window, Chain Saw first
+            if (IsOverheated && TryGetOverheatTool(out uint overheatTool))
+                return overheatTool;
+
             //Tools
-            if (CanUseTools(ref actionID, false) && !IsOverheated)
+            if (!IsOverheated &&
+                CanUseTools(ref actionID, false, holdSawForWildfire: ShouldReserveSawForWildfire(0)))
                 return actionID;
 
             // Heatblast
