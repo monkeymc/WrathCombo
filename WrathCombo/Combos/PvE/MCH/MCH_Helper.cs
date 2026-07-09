@@ -98,6 +98,17 @@ internal partial class MCH
         (IsChainSawCD(toolCutoff) || skipHyperchargeHold) &&
         (!HasStatusEffect(Buffs.ExcavatorReady) || skipExcavatorHold);
 
+    // Wildfire is the burst anchor and must never drift: once it lands within
+    // the next GCD on a target it applies to, Hypercharge goes out on the next
+    // weave slot (Barrel Stabilizer's Hypercharged buff guarantees it is
+    // castable even below 50 Heat) and every tool/combo hold is skipped —
+    // pending tools are pushed to after the overheat window instead.
+    private static bool IsWildfireImminent(int wildfireBossOnlyOption) =>
+        LevelChecked(Wildfire) &&
+        GetCooldownRemainingTime(Wildfire) <= GCDTotal &&
+        (wildfireBossOnlyOption == 0 || TargetIsBoss()) &&
+        CanApplyStatus(CurrentTarget, Debuffs.Wildfire);
+
     private static bool ShouldUseHyperchargeST(int wildfireBossOnlyOption) =>
         ActionReady(Wildfire) ||
         JustUsed(FullMetalField, GCDTotal / 2) ||
@@ -116,10 +127,17 @@ internal partial class MCH
         if (GetTargetHPPercent() <= hpThreshold)
             return false;
 
-        return IsHyperchargeReady() &&
-               (!IsComboExpiring(6) || skipHyperchargeHold) &&
+        // Full Metal Machinist must always clear first (Full Metal Field
+        // precedes Hypercharge), even when Wildfire is imminent.
+        if (!IsHyperchargeReady() ||
+            HasStatusEffect(Buffs.FullMetalMachinist))
+            return false;
+
+        if (IsWildfireImminent(wildfireBossOnlyOption))
+            return true;
+
+        return (!IsComboExpiring(6) || skipHyperchargeHold) &&
                AreHyperchargeToolsReady(wildfireHyperchargeCutoff, skipHyperchargeHold, skipExcavatorHold) &&
-               !HasStatusEffect(Buffs.FullMetalMachinist) &&
                ShouldUseHyperchargeST(wildfireBossOnlyOption);
     }
 
@@ -168,7 +186,9 @@ internal partial class MCH
         !IsOverheated &&
         (ActionReady(Wildfire) ||
          GetCooldownRemainingTime(Wildfire) > 90 ||
-         GetCooldownRemainingTime(Wildfire) <= GCDTotal ||
+         // Two GCDs early: the buff blocks Hypercharge, so Full Metal Field
+         // must be done before Wildfire comes up or Wildfire drifts.
+         GetCooldownRemainingTime(Wildfire) <= GCDTotal * 2 ||
          GetStatusEffectRemainingTime(Buffs.FullMetalMachinist) <= 6);
 
     private static bool JustUsedOverheatGCD(float window, bool onAoE) =>
