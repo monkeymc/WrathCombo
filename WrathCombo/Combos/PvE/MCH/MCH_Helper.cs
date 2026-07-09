@@ -123,44 +123,32 @@ internal partial class MCH
         int hpThreshold = 25,
         bool skipExcavatorHold = false,
         bool skipHyperchargeHold = false,
-        float wildfireHyperchargeCutoff = 9f,
         int wildfireBossOnlyOption = 1) =>
         onAoE
             ? CanHyperchargeAoE(useAirAnchor, toolHoldThreshold, hpThreshold)
-            : CanHyperchargeST(hpThreshold, skipExcavatorHold, skipHyperchargeHold, wildfireHyperchargeCutoff,
-                wildfireBossOnlyOption);
+            : CanHyperchargeST(hpThreshold, skipExcavatorHold, skipHyperchargeHold, wildfireBossOnlyOption);
 
     private static bool IsHyperchargeReady() =>
         (ActionReady(Hypercharge) || HasStatusEffect(Buffs.Hypercharged)) && !IsOverheated;
 
-    // One tool is always cast inside the overheat window — on the GCD after the
-    // last Blazing Shot, or ahead of them outside Wildfire — so a single pending
-    // tool no longer has to be spent before Hypercharge. Only a second one does.
-    private static int ToolsPendingWithin(float horizon, bool skipExcavatorHold)
-    {
-        var pending = 0;
-
-        if (!IsDrillCD(horizon))
-            pending++;
-
-        if (!IsAirAnchorCD(horizon))
-            pending++;
-
-        if (!IsChainSawCD(horizon))
-            pending++;
-
-        if (HasStatusEffect(Buffs.ExcavatorReady) && !skipExcavatorHold)
-            pending++;
-
-        return pending;
-    }
+    // Head–Tail placement. A tool that is ready *now* goes out ahead of
+    // Hypercharge (the head) — this mirrors CanUseTools exactly, so Hypercharge
+    // is held precisely when a tool would otherwise be cast. A tool merely due
+    // during the window costs nothing and needs no hold: Overheat ends the
+    // instant its fifth stack is spent, so the tool lands on the very next GCD
+    // (the tail). No horizon, no arithmetic — the player's ~120ms ping makes any
+    // sub-second window guard untrustworthy.
+    private static bool IsAnyToolReadyNow(bool skipExcavatorHold) =>
+        ToolsReady(Chainsaw) && !HasStatusEffect(Buffs.ExcavatorReady) ||
+        ToolsReady(Excavator) && HasStatusEffect(Buffs.ExcavatorReady) && !skipExcavatorHold ||
+        ToolsReady(AirAnchor) ||
+        ToolsReady(Drill);
 
     private static bool AreHyperchargeToolsReady(
-        float toolCutoff,
         bool skipHyperchargeHold,
         bool skipExcavatorHold) =>
         skipHyperchargeHold ||
-        ToolsPendingWithin(toolCutoff, skipExcavatorHold) <= 1;
+        !IsAnyToolReadyNow(skipExcavatorHold);
 
     private static bool IsWildfireBound(int wildfireBossOnlyOption) =>
         LevelChecked(Wildfire) &&
@@ -168,33 +156,33 @@ internal partial class MCH
         CanApplyStatus(CurrentTarget, Debuffs.Wildfire);
 
     // Wildfire is the burst anchor and must never drift, and every Wildfire is
-    // bound to one Hypercharge. Wildfire takes the first weave slot and
-    // Hypercharge the second (Barrel Stabilizer's Hypercharged buff guarantees
-    // Hypercharge is usable there even below 50 Heat). This helper is the
-    // fallback for the reverse order, where Hypercharge has to lead because
-    // Wildfire's own weave was gated on a check Hypercharge does not share.
+    // bound to one Hypercharge. Hypercharge takes the first weave slot and
+    // Wildfire the second, so Wildfire's 10s/6-weaponskill count starts late
+    // enough into the GCD for the tail tool to be its sixth weaponskill with
+    // ping to spare. Hypercharge therefore leads on the slot where Wildfire is
+    // ready, skipping every tool and combo hold.
     private static bool IsWildfireReadyNow(int wildfireBossOnlyOption) =>
         IsWildfireBound(wildfireBossOnlyOption) && ActionReady(Wildfire);
 
-    // ...and for an overheat window's length before that, Hypercharge waits. An
-    // earlier one would still be running when Wildfire came up, spending the
-    // window's Blazing Shots outside it and leaving no room for the tool. The
-    // extra GCD keeps a Hypercharge fired just outside this horizon from
-    // finishing fractionally late.
+    // Barrel Stabilizer's Hypercharged buff is what pays for the Wildfire-bound
+    // Hypercharge below 50 Heat. A filler Hypercharge must never spend it, or
+    // the burst arrives unfuelled and Wildfire falls back to firing alone. Above
+    // 50 Heat there is nothing to protect: Heat can pay for the bound cast
+    // whichever resource the filler consumed.
+    private static bool WouldStrandWildfireHypercharge(int wildfireBossOnlyOption) =>
+        IsWildfireBound(wildfireBossOnlyOption) &&
+        !ActionReady(Wildfire) &&
+        HasStatusEffect(Buffs.Hypercharged) &&
+        Heat < 50;
+
+    // For an overheat window's length before Wildfire, Hypercharge waits: an
+    // earlier one would still be running when Wildfire came up, spending its
+    // Blazing Shots outside the burst. The extra GCD keeps a Hypercharge fired
+    // just outside this horizon from finishing fractionally late.
     private static bool IsWildfireWithinOverheat(int wildfireBossOnlyOption) =>
         IsWildfireBound(wildfireBossOnlyOption) &&
         !ActionReady(Wildfire) &&
         GetCooldownRemainingTime(Wildfire) <= OverheatDuration + GCDTotal;
-
-    // Chain Saw and Excavator are the strongest tools and belong inside the
-    // Wildfire window, so they are not spent on the GCD that precedes it. Only
-    // reserve them once Hypercharge can actually follow Wildfire: otherwise
-    // Wildfire never weaves, its cooldown sits at zero, and the reservation
-    // would hold both tools indefinitely.
-    private static bool ShouldReserveSawForWildfire(int wildfireBossOnlyOption) =>
-        IsWildfireBound(wildfireBossOnlyOption) &&
-        GetCooldownRemainingTime(Wildfire) <= GCDTotal &&
-        IsHyperchargeReady();
 
     private static bool ShouldUseHyperchargeST(int wildfireBossOnlyOption) =>
         ActionReady(Wildfire) ||
@@ -208,7 +196,6 @@ internal partial class MCH
         int hpThreshold = 25,
         bool skipExcavatorHold = false,
         bool skipHyperchargeHold = false,
-        float wildfireHyperchargeCutoff = 9f,
         int wildfireBossOnlyOption = 1)
     {
         if (GetTargetHPPercent() <= hpThreshold)
@@ -220,21 +207,22 @@ internal partial class MCH
             HasStatusEffect(Buffs.FullMetalMachinist))
             return false;
 
-        // Wildfire has just been woven and is bound to this Hypercharge: it goes
-        // out on the very next weave slot, skipping every tool and combo hold.
-        if (JustUsed(Wildfire, GCDTotal + 0.9f))
-            return true;
-
-        // Wildfire is up but has not woven yet (it is gated on a boss check
-        // Hypercharge does not share). Lead anyway rather than stall the burst.
+        // Wildfire is up: Hypercharge leads it on this very weave slot, skipping
+        // every tool and combo hold. Wildfire takes the slot straight after.
         if (IsWildfireReadyNow(wildfireBossOnlyOption))
             return true;
 
-        if (IsWildfireWithinOverheat(wildfireBossOnlyOption))
+        // Wildfire fired without its Hypercharge (it weaved alone, or clipped a
+        // GCD, rather than drift). Chase it: the window still lands inside it.
+        if (JustUsed(Wildfire, GCDTotal + 0.9f))
+            return true;
+
+        if (IsWildfireWithinOverheat(wildfireBossOnlyOption) ||
+            WouldStrandWildfireHypercharge(wildfireBossOnlyOption))
             return false;
 
         return (!IsComboExpiring(6) || skipHyperchargeHold) &&
-               AreHyperchargeToolsReady(wildfireHyperchargeCutoff, skipHyperchargeHold, skipExcavatorHold) &&
+               AreHyperchargeToolsReady(skipHyperchargeHold, skipExcavatorHold) &&
                ShouldUseHyperchargeST(wildfireBossOnlyOption);
     }
 
@@ -275,59 +263,14 @@ internal partial class MCH
 
     private const float OverheatDuration = 10f;
 
-    private static float OverheatRemaining => Gauge.OverheatTimeRemaining / 1000f;
-
-    private static float OverheatElapsed => OverheatDuration - OverheatRemaining;
-
-    // Blazing Shot recasts in 1.5s against the standard 2.5s GCD, both scaled
-    // by the same Skill Speed.
-    private static float HeatedGCD => GCDTotal * 0.6f;
-
-    // The Overheated status carries one stack per Blazing Shot left. Assume a
-    // full window when it cannot be read, so an unreadable gauge never lets a
-    // tool squeeze a Blazing Shot out of the window.
-    private static int RemainingBlazingShots =>
-        GetStatusEffectStacks(Buffs.Overheated) is var stacks && stacks > 0 ? stacks : 5;
-
-    // Exactly one tool GCD fits inside a Heated Window. Pressing it costs a
-    // full GCD, after which the remaining Blazing Shots are one recast apart —
-    // so only the last of them has to still land inside the window, not a
-    // recast beyond it. At a 2.45s GCD that is 8.34s of a 10s window; a second
-    // tool would need 2.45s more than the window has.
-    private static bool ToolFitsInOverheat() =>
-        OverheatRemaining >= GCDTotal + (RemainingBlazingShots - 1) * HeatedGCD + 0.4f;
-
-    // Fits one tool into the overheat window, at whichever heated GCD it first
-    // becomes safe to. Chain Saw leads: it hits hardest and readies Excavator.
-    //
-    // Never inside Wildfire, though. Overheat ends the instant its fifth stack
-    // is spent, so a tool already falls on the GCD straight after the last
-    // Blazing Shot — still inside Wildfire, which counts six weaponskills.
-    // Moving it to the front of the window instead delays that sixth
-    // weaponskill past Wildfire's expiry and forfeits 240 potency of it, buying
-    // nothing: the tool is cast either way.
-    private static bool TryGetOverheatTool(out uint action)
-    {
-        action = 0;
-
-        if (!IsOverheated ||
-            HasStatusEffect(Buffs.Wildfire) ||
-            !LevelChecked(Drill) ||
-            JustUsedTool(OverheatElapsed) ||
-            !ToolFitsInOverheat())
-            return false;
-
-        if (ActionReady(Chainsaw) && !HasStatusEffect(Buffs.ExcavatorReady))
-            action = Chainsaw;
-        else if (LevelChecked(Excavator) && HasStatusEffect(Buffs.ExcavatorReady))
-            action = Excavator;
-        else if (ActionReady(AirAnchor))
-            action = AirAnchor;
-        else if (ActionReady(Drill))
-            action = Drill;
-
-        return action != 0;
-    }
+    // Nothing is ever inserted into a Heated Window: five Blazing Shots and
+    // nothing else. A tool cannot fit at this GCD speed, and no arithmetic
+    // guard over the live Overheat timer can be trusted at ~120ms ping — the
+    // one that used to live here read GCDTotal, which is the recast of the last
+    // GCD *pressed* (~1.5s once a Blazing Shot is out) rather than a 2.5s base,
+    // and wasted an Overheat stack in four windows out of ten. Tools go at the
+    // head (ahead of Hypercharge) or the tail (the free GCD after the fifth
+    // stack is spent, still inside Wildfire). See docs/adr/0002.
 
     #endregion
 
@@ -387,28 +330,36 @@ internal partial class MCH
                   GetTargetHPPercent() > hpThreshold || TargetIsBoss()) &&
               GetCooldownRemainingTime(Wildfire) <= 20);
 
+    // Wildfire never drifts, so it depends on nothing but its own readiness.
+    // Hypercharge leads it purely by being checked first at the call site: if
+    // Hypercharge could fire, it already took this weave slot and Wildfire takes
+    // the next one. If Hypercharge could not, Wildfire goes out alone rather
+    // than wait — a Wildfire window with a late Hypercharge beats a drifted one,
+    // and Hypercharge chases it via its own JustUsed(Wildfire) clause. Coupling
+    // the two here is what let Hypercharge hold Wildfire hostage before.
     private static bool CanWildfireWeave(
         int hpThreshold = 0,
         int bossOnlyOption = 1,
-        bool requireBoss = false,
-        float? hyperchargeWindow = null) =>
+        bool requireBoss = false) =>
         CanApplyStatus(CurrentTarget, Debuffs.Wildfire) &&
         ActionReady(Wildfire) &&
-        // Wildfire leads its bound Hypercharge rather than following it: taking
-        // the first weave slot means Wildfire can never be held hostage, and it
-        // pushes Hypercharge to the second slot, where the overheat window
-        // starts late enough into the GCD for a tool to still fit inside it.
-        // Hypercharge merely has to be able to follow — or already have gone
-        // out, which is the never-drift backstop for any path that fires it
-        // early.
-        (IsHyperchargeReady() && !HasStatusEffect(Buffs.FullMetalMachinist) ||
-         IsOverheated ||
-         JustUsed(Hypercharge, hyperchargeWindow ?? GCDTotal + 0.9f)) &&
         !HasStatusEffect(Buffs.Wildfire) &&
         (requireBoss
             ? TargetIsBoss()
             : bossOnlyOption == 0 &&
             GetTargetHPPercent() > hpThreshold || TargetIsBoss());
+
+    // Last resort for the never-drift rule: Wildfire came up during the stretch
+    // of a GCD that is too late to weave in, so there is no weave slot left
+    // before the next GCD fires. Press it anyway and eat the clip. Wildfire
+    // ready beats a clean GCD; a whole cycle of drift does not.
+    //
+    // In combat only: out of combat the GCD is not rolling, so CanWeave is
+    // permanently false and this would seize the button before the opener.
+    private static bool ShouldClipWildfire(int hpThreshold, int bossOnlyOption) =>
+        InCombat() &&
+        !CanWeave() &&
+        CanWildfireWeave(hpThreshold, bossOnlyOption);
 
     #endregion
 
@@ -715,16 +666,15 @@ internal partial class MCH
         JustUsed(Drill, window) ||
         JustUsed(Excavator, window);
 
-    private static bool CanUseTools(ref uint actionID, bool onAoE, bool useAirAnchor = true, bool holdExcavatorForWildfire = false,
-        bool holdSawForWildfire = false)
+    private static bool CanUseTools(ref uint actionID, bool onAoE, bool useAirAnchor = true, bool holdExcavatorForWildfire = false)
     {
-        if (ToolsReady(Chainsaw) && !HasStatusEffect(Buffs.ExcavatorReady) && !holdSawForWildfire)
+        if (ToolsReady(Chainsaw) && !HasStatusEffect(Buffs.ExcavatorReady))
         {
             actionID = Chainsaw;
             return true;
         }
 
-        if (ToolsReady(Excavator) && HasStatusEffect(Buffs.ExcavatorReady) && !holdSawForWildfire &&
+        if (ToolsReady(Excavator) && HasStatusEffect(Buffs.ExcavatorReady) &&
             (onAoE || !holdExcavatorForWildfire ||
              GetStatusEffectRemainingTime(Buffs.ExcavatorReady) <= GCDTotal * 3))
         {

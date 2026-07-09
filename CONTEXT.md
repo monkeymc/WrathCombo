@@ -8,32 +8,36 @@ Glossary of domain terms as used in this project's MCH rotation work. Terms, not
 
 **Tool** — One of the big-potency charged GCDs: Drill, Air Anchor, Chain Saw, Excavator. Tools do not consume Overheat stacks but do consume time inside a Heated Window.
 
-**Tool Fit** — Inserting exactly one Tool GCD inside a Heated Window while still landing all 5 Blazing Shots before Overheat expires. One tool fits (with ~0.5–1s margin at ~2.45s GCD); two never do.
+**Head** — The GCD slot immediately *before* Hypercharge is woven. A Tool placed at the Head goes out first and delays the Heated Window by one GCD.
 
-**Second Form** — Excavator, unlocked by the ExcavatorReady buff that Chain Saw grants. This is why Chain Saw is the preferred Tool Fit: it hits hard *and* readies a second tool.
+**Tail** — The GCD slot immediately *after* the Heated Window ends. Because Overheat ends the instant its fifth stack is spent, the Tail arrives one heated recast after the last Blazing Shot — early enough to still sit inside a Wildfire window.
+
+**Second Form** — Excavator, unlocked by the ExcavatorReady buff that Chain Saw grants.
 
 **Burst Anchor (Wildfire)** — The 120s cooldown that the whole burst aligns to. It counts the next 6 GCDs within 10s of application; any GCD counts equally (Blazing Shot, Tool, Full Metal Field). Must never drift.
 
 **Wildfire Drift** — Wildfire being applied later than the moment it comes off cooldown. Compounds every 2-minute cycle and desyncs the burst from party buffs.
 
-**Tool Hold** — Refusing to Hypercharge until all Tools are on cooldown beyond a threshold, so no Tool comes up (and drifts) behind the Heated Window.
+**Tool Hold** — Refusing to Hypercharge while a Tool is ready *right now*, so that Tool goes out at the Head instead of drifting behind the Heated Window. Tools merely *due* during the window do not hold Hypercharge — the Tail catches them.
 
 **Imminent-Wildfire Bypass** — Firing Hypercharge early (Wildfire within one GCD of ready) and skipping Tool Holds, on the theory that Wildfire weaves immediately after. Observed failure mode: Hypercharge goes out before Wildfire is castable and Wildfire drifts behind the Heated Window. Superseded by the Wildfire–Hypercharge Bind.
 
 ## Rules (agreed)
 
-**Wildfire never drifts** — absolute rule; everything else yields to it.
+**Wildfire never drifts** — Wildfire is pressed the moment it is ready; nothing gates it, and it will clip a GCD rather than wait. One exception, taken knowingly: the Wildfire–Hypercharge Bind costs one animation lock (~0.65s) of drift per cycle, because Hypercharge takes the weave slot Wildfire becomes ready in. See `docs/adr/0001` for the measurements and why that trade was accepted.
 
-**Wildfire–Hypercharge Bind** — Every Wildfire window contains exactly one Hypercharge, double-woven under the same GCD. Wildfire takes the first weave slot and Hypercharge the second, so Wildfire is never held hostage by Hypercharge's readiness.
+**No Timing Arithmetic (Ping Rule)** — The player runs at ~120ms ping; every event lands late by a variable amount. No rule may depend on fractional-second arithmetic over live timers (fitting X seconds of casts into Y seconds of window). Rules must be positional and discrete: counts, slots, ready-or-not.
 
-**Single Tool Insertion** — At most one GCD may be inserted into a Heated Window, and it must be a Tool. Full Metal Field and combo GCDs are never inserted.
+**Wildfire–Hypercharge Bind** — Every Wildfire window contains exactly one Hypercharge, double-woven under the same GCD. **Hypercharge takes the first weave slot and Wildfire the second**: Wildfire's 10-second, 6-weaponskill count then starts later, giving the sixth weaponskill (the Tail Tool) ping-safe margin. Two fallbacks protect the never-drift rule:
+1. *Wildfire fires alone* — if Hypercharge cannot fire when Wildfire is ready, Wildfire goes out on the first available weave slot by itself; Hypercharge follows as soon as it can.
+2. *Wildfire clips* — if the weave window was missed entirely and the GCD is already ready, Wildfire fires anyway, clipping the GCD. Wildfire ready → Wildfire wins.
 
-**Tail Placement** — Inside a Wildfire window the Tool goes *after* the fifth Blazing Shot, not before it. Overheat ends the instant its fifth stack is spent, so the Tool falls on the very next GCD and is still inside Wildfire. Putting it at the head of the window instead delays the sixth weaponskill past Wildfire's expiry, forfeiting 240 potency of Wildfire and buying nothing. Outside a Wildfire window the Tool goes at the head, which reduces tool drift.
+**Hypercharge Fuel Guarantee** — The rotation must *arrive* at Wildfire with Hypercharge usable: no filler Hypercharge may spend the Heat (or displace the Hypercharged buff from Barrel Stabilizer) that the Wildfire-bound Hypercharge needs. The fire-alone fallback is a safety net, not a plan.
+
+**No In-Window Insertion** — No GCD is ever inserted into a Heated Window: five Blazing Shots and nothing else. (An in-window Tool cannot fit at this GCD speed, and per the Ping Rule no arithmetic guard may claim otherwise.)
+
+**Head–Tail Placement** — A Tool ready at the moment Hypercharge would fire goes out first, at the Head. Tools that come ready during the Heated Window land at the Tail, which costs nothing. Inside a Wildfire window only the Tail is used — the Tail Tool is the sixth weaponskill; nothing delays the Wildfire-bound Hypercharge.
 
 **Hypercharge Cost** — Hypercharge is castable at 50+ Heat, or freely via the Hypercharged status from Barrel Stabilizer (which is what guarantees the Bind at the 2-minute burst).
 
-**Tool Fit Priority** — Chain Saw > Excavator > Air Anchor > Drill. Chain Saw first (Second Form + battery), Excavator next (its readiness is an expiring buff), Air Anchor next (40s cooldown that hates drift), Drill last (its two charges absorb drift harmlessly). A tool due to come ready inside the Heated Window no longer blocks Hypercharge — the window eats it.
-
-**Opportunistic Fit** — The Tool Fit may happen at any heated GCD slot, not just the first: whenever an eligible tool is ready and the remaining Overheat time still fits all remaining Blazing Shots plus one tool GCD (with snapshot margin). At most one insertion per window.
-
-**No Reassemble In-Window** — Reassemble never weaves during Overheat; the inserted tool goes out unassembled. Heated weave slots are reserved for Wildfire and heat oGCDs.
+**No Reassemble In-Window** — Reassemble never weaves during Overheat; a Tail Tool goes out unassembled if its Reassemble would have to weave heated. Heated weave slots are reserved for Wildfire and heat oGCDs.

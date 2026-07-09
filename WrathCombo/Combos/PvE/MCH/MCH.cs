@@ -33,11 +33,12 @@ internal partial class MCH : PhysicalRanged
                     GetTargetHPPercent() <= 1)
                     return OriginalHook(RookOverdrive);
 
-                if (CanWildfireWeave(requireBoss: true))
-                    return Wildfire;
-
+                // Hypercharge leads, Wildfire takes the second weave slot.
                 if (CanHypercharge(false))
                     return Hypercharge;
+
+                if (CanWildfireWeave(requireBoss: true))
+                    return Wildfire;
 
                 if (GaussRicochetWeaves(out gaussRico, false, true))
                     return gaussRico;
@@ -197,11 +198,14 @@ internal partial class MCH : PhysicalRanged
                     GetTargetHPPercent() <= 1)
                     return OriginalHook(RookOverdrive);
 
-                if (CanWildfireWeave(0, 0))
-                    return Wildfire;
-
+                // Hypercharge leads, Wildfire follows in the second weave slot:
+                // Wildfire's 10s then starts late enough into the GCD that the
+                // tail tool is comfortably its sixth weaponskill.
                 if (CanHypercharge(false, hpThreshold: 0, wildfireBossOnlyOption: 0))
                     return Hypercharge;
+
+                if (CanWildfireWeave(0, 0))
+                    return Wildfire;
 
                 if (GaussRicochetWeaves(out gaussRico, false, true))
                     return gaussRico;
@@ -232,17 +236,18 @@ internal partial class MCH : PhysicalRanged
                 }
             }
 
+            // Wildfire came up too late in the GCD to weave. Clip it out rather
+            // than let it drift a whole cycle.
+            if (ShouldClipWildfire(0, 0))
+                return Wildfire;
+
             // Full Metal Field
             if (CanUseFullMetalField)
                 return FullMetalField;
 
-            // One tool fitted into the overheat window, Chain Saw first
-            if (IsOverheated && TryGetOverheatTool(out uint overheatTool))
-                return overheatTool;
-
             //Tools
             if (!IsOverheated &&
-                CanUseTools(ref actionID, false, holdSawForWildfire: ShouldReserveSawForWildfire(0)))
+                CanUseTools(ref actionID, false))
                 return actionID;
 
             // Heatblast
