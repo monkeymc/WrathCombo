@@ -163,20 +163,22 @@ internal partial class MCH : PhysicalRanged
     {
         protected internal override Preset Preset => Preset.MCH_ST_AdvancedMode;
 
+        // Fixed optimal rotation: every sub-option other than the Opener is hardcoded here.
+        // The sub-preset checkboxes and their sliders still render in the UI, but only the
+        // Opener ones have any effect. No HP or boss-only gating: cooldowns are spent on any target.
         protected override uint Invoke(uint actionID)
         {
             if (!CustomActionHelper.OneButtonRotationChecker(actionID, CustomActionType.SingleTargetDPS, SplitShot, HeatedSplitShot))
                 return actionID;
 
-            // Opener
+            // Opener (user-configurable, unchanged)
             if (IsEnabled(Preset.MCH_ST_Adv_Opener) &&
                 (MCH_HaveTarget == 1 || HasBattleTarget()) &&
                 Opener().FullOpener(ref actionID))
                 return actionID;
 
             //Reassemble to start before combat/after downtime
-            if (IsEnabled(Preset.MCH_ST_Adv_Reassemble) &&
-                CanReassemble(false, MCH_ST_Adv_ReassembleChoice, MCH_ST_ReassemblePool, ReassembleHPThreshold) &&
+            if (CanReassemble(false, 1, 0, 0) &&
                 !IsOverheated && !HasWeaved())
                 return Reassemble;
 
@@ -187,118 +189,62 @@ internal partial class MCH : PhysicalRanged
             // All weaves
             if (CanWeave())
             {
-                if (IsEnabled(Preset.MCH_ST_Adv_GaussRicochet) &&
-                    MCH_ST_GaussOnlyOrBoth == 0 &&
-                    OvercapGaussRicochetProtection(out uint gaussRico))
+                if (OvercapGaussRicochetProtection(out uint gaussRico))
                     return gaussRico;
 
-                if (IsEnabled(Preset.MCH_ST_Adv_QueenOverdrive) &&
-                    RobotActive && ActionReady(OriginalHook(RookOverdrive)) &&
-                    GetTargetHPPercent() <= MCH_ST_QueenOverDriveHPThreshold)
+                // Dump the Queen's remaining battery before the target dies
+                if (RobotActive && ActionReady(OriginalHook(RookOverdrive)) &&
+                    GetTargetHPPercent() <= 1)
                     return OriginalHook(RookOverdrive);
 
-                if (IsEnabled(Preset.MCH_ST_Adv_WildFire) &&
-                    CanWildfireWeave(WildfireHPThreshold, MCH_ST_WildfireBossOnlyOption))
+                if (CanWildfireWeave(0, 0))
                     return Wildfire;
 
-                if (IsEnabled(Preset.MCH_ST_Adv_Hypercharge))
-                {
-                    bool wildfireAboutToBeUsed = IsEnabled(Preset.MCH_ST_Adv_WildFire) &&
-                                                 IsWildfireAboutToBeUsed(WildfireHPThreshold, MCH_ST_WildfireBossOnlyOption);
+                if (CanHypercharge(false, hpThreshold: 0, wildfireBossOnlyOption: 0))
+                    return Hypercharge;
 
-                    if (CanHypercharge(false,
-                        hpThreshold: HyperchargeHPThreshold,
-                        skipExcavatorHold: IsEnabled(Preset.MCH_ST_Adv_Tools_AllowExcavatorPostWildfire) && wildfireAboutToBeUsed,
-                        skipHyperchargeHold: IsEnabled(Preset.MCH_ST_Adv_Tools_AllowClainsawPostWildfire) && wildfireAboutToBeUsed,
-                        wildfireHyperchargeCutoff: wildfireAboutToBeUsed ? MCH_ST_WildfireHyperchargeCutoffThreshold : 9f,
-                        wildfireBossOnlyOption: MCH_ST_WildfireBossOnlyOption))
-                        return Hypercharge;
-                }
-
-                if (IsEnabled(Preset.MCH_ST_Adv_GaussRicochet) &&
-                    GaussRicochetWeaves(out gaussRico, false, true,
-                        gaussOnlyOrBoth: MCH_ST_GaussOnlyOrBoth,
-                        chargePool: MCH_ST_GaussRicoManualUse))
+                if (GaussRicochetWeaves(out gaussRico, false, true))
                     return gaussRico;
 
                 if (!IsOverheated)
                 {
-                    if (IsEnabled(Preset.MCH_ST_Adv_Reassemble) &&
-                        CanReassemble(false, MCH_ST_Adv_ReassembleChoice, MCH_ST_ReassemblePool, ReassembleHPThreshold))
+                    if (CanReassemble(false, 1, 0, 0))
                         return Reassemble;
 
-                    if (IsEnabled(Preset.MCH_ST_Adv_Stabilizer) &&
-                        CanBarrelStabilizer(false, BarrelStabilizerHPThreshold, MCH_ST_BarrelStabilizerBossOnlyOption))
+                    if (CanBarrelStabilizer(false, 0, 0))
                         return BarrelStabilizer;
 
-                    if (IsEnabled(Preset.MCH_ST_Adv_TurretQueen) &&
-                        CanQueen(hpThreshold: QueenHPThreshold, wildfireBossOnlyOption: MCH_ST_WildfireBossOnlyOption,
-                            turretUsage: MCH_ST_TurretUsage))
+                    if (CanQueen(hpThreshold: 0, wildfireBossOnlyOption: 0))
                         return OriginalHook(RookAutoturret);
 
-                    if (IsEnabled(Preset.MCH_ST_Adv_GaussRicochet) &&
-                        GaussRicochetWeaves(out gaussRico, false, false,
-                            gaussOnlyOrBoth: MCH_ST_GaussOnlyOrBoth,
-                            chargePool: MCH_ST_GaussRicoManualUse))
+                    if (GaussRicochetWeaves(out gaussRico, false, false))
                         return gaussRico;
 
-                    if (IsEnabled(Preset.MCH_ST_Dismantle) &&
-                        ActionReady(Dismantle) && GroupDamageIncoming() &&
-                        !JustUsed(Tactician, 6) && CanApplyStatus(CurrentTarget, Debuffs.Dismantled) &&
-                        GetStatusEffectRemainingTime(Debuffs.Dismantled, CurrentTarget, true) > MCH_DismantledDuration)
-                        return Dismantle;
-
-                    if (IsEnabled(Preset.MCH_ST_Adv_Tactician) &&
-                        ActionReady(Tactician) && GroupDamageIncoming() &&
-                        !JustUsed(Dismantle, 6) && NumberOfAlliesInRange(Tactician) >= GetPartyMembers().Count * .75 &&
-                        !HasAnyStatusEffects([BRD.Buffs.Troubadour, DNC.Buffs.ShieldSamba, Buffs.Tactician], anyOwner: true))
-                        return Tactician;
-
-                    // Healing
-                    if (IsEnabled(Preset.MCH_ST_Adv_SecondWind) &&
-                        Role.CanSecondWind(MCH_ST_SecondWindHPThreshold))
-                        return Role.SecondWind;
-
                     // Interrupt
-                    if (Role.CanHeadGraze(Preset.MCH_ST_Adv_Interrupt))
+                    if (Role.CanHeadGraze(true))
                         return Role.HeadGraze;
                 }
                 else
                 {
                     // Queen in hypercharge
-                    if (IsEnabled(Preset.MCH_ST_Adv_TurretQueen) &&
-                        IsEnabled(Preset.MCH_ST_Adv_QueenInHypercharge) &&
-                        CanQueen(hpThreshold: QueenHPThreshold, wildfireBossOnlyOption: MCH_ST_WildfireBossOnlyOption,
-                            turretUsage: MCH_ST_TurretUsage))
+                    if (CanQueen(hpThreshold: 0, wildfireBossOnlyOption: 0))
                         return OriginalHook(RookAutoturret);
                 }
             }
 
             // Full Metal Field
-            if (IsEnabled(Preset.MCH_ST_Adv_Stabilizer_FullMetalField) &&
-                CanUseFullMetalField)
+            if (CanUseFullMetalField)
                 return FullMetalField;
 
             //Tools
-            if (IsEnabled(Preset.MCH_ST_Adv_Tools) &&
-                GetTargetHPPercent() > ToolsHPThreshold)
-            {
-                bool wildfireAboutToBeUsed = IsEnabled(Preset.MCH_ST_Adv_WildFire) &&
-                                             IsWildfireAboutToBeUsed(WildfireHPThreshold, MCH_ST_WildfireBossOnlyOption);
-                bool holdExcavatorForWildfire = IsEnabled(Preset.MCH_ST_Adv_Tools_AllowExcavatorPostWildfire) && wildfireAboutToBeUsed;
-
-                if (CanUseTools(ref actionID, false, holdExcavatorForWildfire: holdExcavatorForWildfire) &&
-                    !IsOverheated)
-                    return actionID;
-            }
+            if (CanUseTools(ref actionID, false) && !IsOverheated)
+                return actionID;
 
             // Heatblast
-            if (IsEnabled(Preset.MCH_ST_Adv_Heatblast) &&
-                ActionReady(OriginalHook(Heatblast)) && IsOverheated)
+            if (ActionReady(OriginalHook(Heatblast)) && IsOverheated)
                 return OverheatGCD(onAoE: false);
 
-            return DoBasicCombo(actionID, IsEnabled(Preset.MCH_ST_Adv_Reassemble),
-                MCH_ST_Adv_ReassembleChoice, MCH_ST_ReassemblePool, ReassembleHPThreshold);
+            return DoBasicCombo(actionID, true, 1, 0, 0);
         }
     }
 
