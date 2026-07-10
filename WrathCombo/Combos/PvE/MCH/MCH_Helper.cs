@@ -77,6 +77,11 @@ internal partial class MCH
         int wildfireBossOnlyOption = 1,
         int turretUsage = 100)
     {
+        // Queen only fights the player's current enemy; summoning her with no
+        // hostile target selected forfeits the Battery outright.
+        if (!HasBattleTarget())
+            return false;
+
         if (onAoE)
         {
             if (!ActionReady(OriginalHook(RookAutoturret)))
