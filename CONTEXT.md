@@ -8,6 +8,8 @@ Glossary of domain terms as used in this project's MCH rotation work. Terms, not
 
 **Tool** — One of the big-potency charged GCDs: Drill, Air Anchor, Chain Saw, Excavator. Tools do not consume Overheat stacks but do consume time inside a Heated Window.
 
+**Queue-Window Ready** — What "ready" means for a Tool at a GCD slot: the Tool will be pressable by the time this slot's press executes — its remaining cooldown ends no later than the slot opening plus the game's input queue (~0.5s). Measured relative to the slot, not the press, so a mash-queued press and a press at GCD-up resolve the same answer. Costs at most half a second of GCD slide; the server queue does the timing, not client arithmetic. A Tool outside the queue window is not ready; it takes the next slot.
+
 **Head** — The GCD slot immediately *before* Hypercharge is woven. A Tool placed at the Head goes out first and delays the Heated Window by one GCD.
 
 **Tail** — The GCD slot immediately *after* the Heated Window ends. Because Overheat ends the instant its fifth stack is spent, the Tail arrives one heated recast after the last Blazing Shot — early enough to still sit inside a Wildfire window.
@@ -18,7 +20,7 @@ Glossary of domain terms as used in this project's MCH rotation work. Terms, not
 
 **Wildfire Drift** — Wildfire being applied later than the moment it comes off cooldown. Compounds every 2-minute cycle and desyncs the burst from party buffs.
 
-**Tool Hold** — Refusing to Hypercharge while a Tool is ready *right now*, so that Tool goes out at the Head instead of drifting behind the Heated Window. Tools merely *due* during the window do not hold Hypercharge — the Tail catches them.
+**Tool Hold** — Refusing to fire a *filler* Hypercharge while a Tool is Queue-Window Ready for the Head slot, so that Tool goes out at the Head instead of drifting behind the Heated Window. Tools not ready for the Head do not hold Hypercharge — the Tail catches them. A Wildfire-bound Hypercharge is never held (see Head–Tail Placement: nothing delays it).
 
 **Imminent-Wildfire Bypass** — Firing Hypercharge early (Wildfire within one GCD of ready) and skipping Tool Holds, on the theory that Wildfire weaves immediately after. Observed failure mode: Hypercharge goes out before Wildfire is castable and Wildfire drifts behind the Heated Window. Superseded by the Wildfire–Hypercharge Bind.
 
@@ -41,3 +43,5 @@ Glossary of domain terms as used in this project's MCH rotation work. Terms, not
 **Hypercharge Cost** — Hypercharge is castable at 50+ Heat, or freely via the Hypercharged status from Barrel Stabilizer (which is what guarantees the Bind at the 2-minute burst).
 
 **No Reassemble In-Window** — Reassemble never weaves during Overheat; a Tail Tool goes out unassembled if its Reassemble would have to weave heated. Heated weave slots are reserved for Wildfire and heat oGCDs.
+
+**Queue-Window Slide** — A Tool takes a GCD slot iff it is Queue-Window Ready for that slot; the resulting ≤0.5s GCD slide is accepted in filler. The slide is never taken where it would delay a Wildfire-bound weave (Wildfire never drifts outranks it), and never inside a Heated Window (No In-Window Insertion). Tool Hold uses the same test: a filler Hypercharge is held iff a Tool is Queue-Window Ready for the Head slot — one definition of "ready" everywhere.

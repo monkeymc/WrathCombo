@@ -136,13 +136,14 @@ internal partial class MCH
     private static bool IsHyperchargeReady() =>
         (ActionReady(Hypercharge) || HasStatusEffect(Buffs.Hypercharged)) && !IsOverheated;
 
-    // Head–Tail placement. A tool that is ready *now* goes out ahead of
-    // Hypercharge (the head) — this mirrors CanUseTools exactly, so Hypercharge
-    // is held precisely when a tool would otherwise be cast. A tool merely due
-    // during the window costs nothing and needs no hold: Overheat ends the
+    // Head–Tail placement. A tool that is Queue-Window Ready for the Head slot
+    // goes out ahead of Hypercharge — this mirrors CanUseTools exactly, so
+    // Hypercharge is held precisely when a tool would otherwise be cast. A tool
+    // not ready for the Head costs nothing and needs no hold: Overheat ends the
     // instant its fifth stack is spent, so the tool lands on the very next GCD
-    // (the tail). No horizon, no arithmetic — the player's ~120ms ping makes any
-    // sub-second window guard untrustworthy.
+    // (the tail). Wildfire-bound Hypercharge skips this hold entirely — the
+    // weave/clip paths outrank tool resolution, so Wildfire never waits on a
+    // slide. See docs/adr/0003.
     private static bool IsAnyToolReadyNow(bool skipExcavatorHold) =>
         ToolsReady(Chainsaw) && !HasStatusEffect(Buffs.ExcavatorReady) ||
         ToolsReady(Excavator) && HasStatusEffect(Buffs.ExcavatorReady) && !skipExcavatorHold ||
@@ -641,8 +642,13 @@ internal partial class MCH
 
     #region Tools
 
+    // Queue-Window Ready: the tool will be pressable by the time this slot's
+    // press executes — its cooldown ends within the live GCD roll plus the
+    // server's input queue. The server does the timing, not client arithmetic,
+    // so this survives the Ping Rule; worst case is a ≤0.5s GCD slide. Same
+    // slot-relative test as ActionReady. See docs/adr/0003.
     private static bool ToolsReady(uint actionId) =>
-        LevelChecked(actionId) && (HasCharges(actionId) || GetCooldownRemainingTime(actionId) <= GCDTotal);
+        LevelChecked(actionId) && (HasCharges(actionId) || GetCooldownRemainingTime(actionId) <= RemainingGCD + BaseActionQueue);
 
     private static bool CanUseDrill(bool onAoE) =>
         !onAoE || !LevelChecked(BioBlaster);
